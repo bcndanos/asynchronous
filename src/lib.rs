@@ -13,25 +13,6 @@ impl<T,E> Promise<T,E> where T: Send + 'static , E: Send + 'static {
 		Promise::<T,E> { receiver: rx }
 	}	
 
-	pub fn new_serie<F>(vector_functions:Vec<F>) -> Promise<Vec<T>, E> where F: Send + 'static + FnOnce() -> Result<T,E> {
-		let (tx,rx) = mpsc::channel();
-		thread::spawn(move || { 				
-			let mut responses:Vec<T> = Vec::with_capacity(vector_functions.len());
-			for f in vector_functions {	
-				match f() {
-					Ok(t) => responses.push(t),
-					Err(e) =>  {
-						let r:Result<Vec<T>,E> = Err(e);
-						return tx.send(r)
-					}
-				}
-			}			
-			let r:Result<Vec<T>,E> = Ok(responses);
-			tx.send(r) 
-		});
-		Promise::<Vec<T>,E> { receiver: rx }
-	}
-
 	pub fn all(vector:Vec<Promise<T,E>>) -> Promise<Vec<T>, E> {
 		let (tx,rx) = mpsc::channel();
 		thread::spawn(move || {
