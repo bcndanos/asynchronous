@@ -34,31 +34,40 @@ Promise::new(|| {
 });
 ``` 
 
-Using deferred execution of 3 tasks in Parallel and 2 tasks in Series:
+Using deferred execution of 1 simple tasks, 3 tasks in Parallel and 2 tasks in Series:
 
 ```rust
+use asynchronous::Promise;
 use asynchronous::Deferred;
 use asynchronous::ControlFlow;
 
+let d_a = Deferred::<&str, &str>::new(|| { Ok("a") });
+let p_b = Promise::<&str, &str>::new(|| { Ok("b") });  // Executed right now
 let d1 = Deferred::<u32, &str>::new(|| { Ok(1u32) });
 let d2 = Deferred::<u32, &str>::new(|| { Err("Error Mock") });
 let d3 = Deferred::<u32, &str>::new(|| { Ok(3u32) });
 let d4 = Deferred::<u32, &str>::new(|| { Ok(4u32) });
 let d5 = Deferred::<u32, &str>::new(|| { Ok(5u32) });
 
-let promise_parallel = Deferred::vec_to_promise(vec![d1,d2,d3], ControlFlow::Parallel);
-let promise_series = Deferred::vec_to_promise(vec![d4,d5], ControlFlow::Series);
+let promise = Deferred::vec_to_promise(vec![d1,d2,d3], ControlFlow::Parallel);
+// Only d1, d2 and d3 are being executed at this time.
 
-promise_parallel.then(|res| {
+let value_b = d_a.to_promise().then(|res_a| {
+    assert_eq!(res_a, "a");
+    p_b.then(move |res_b| {
+        Ok(res_a.to_string() + res_b)
+    }).sync()
+}).sync().unwrap();
+assert_eq!(value_b, "ab");
+
+promise.then(|res| {
     // Catch the result. In this case, tasks d4 and d5 never will be executed
     unreachable!();
     Ok(res)
 }).fail(|error| {
     // Catch the error and execute another Promise
-    assert_eq!(error[0], Ok(1u32));
-    assert_eq!(error[1], Err("Error Mock"));
-    assert_eq!(error[2], Ok(3u32));
-    promise_series.sync()
+    assert_eq!(error, vec![Ok(1u32), Err("Error Mock"), Ok(3u32)]);    
+    Deferred::vec_to_promise(vec![d4,d5], ControlFlow::Series).sync()
 }).finally_sync(|res| {   // res : Vec<u32>
     // Do something here    
     assert_eq!(res, vec![4u32, 5u32]);
@@ -408,4 +417,23 @@ mod test {
                 assert_eq!(errors[2], Ok(6u32));
             });
     }    
+
+    #[test]
+    fn nested_promises() {
+        let res = Promise::<_,&str>::new(|| {            
+            // Do nothing
+            Promise::new(|| {
+                Promise::new(|| {
+                    Ok(4)
+                }).then(|res| {
+                    Ok(res + 2)
+                }).sync()
+            }).then(|res| {
+                Ok(res * 7)
+            }).sync()
+        }).then(|res| {
+            Ok(res + 5)
+        }).sync().unwrap();
+        assert_eq!(res, 47);
+    }
 }
