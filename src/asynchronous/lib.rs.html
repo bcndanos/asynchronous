@@ -479,7 +479,6 @@
 <span id="437">437</span>
 <span id="438">438</span>
 <span id="439">439</span>
-<span id="440">440</span>
 </pre><pre class='rust '>
 <span class='doccomment'>/*!
 A **promise** based asynchronous library
@@ -533,8 +532,7 @@ let d4 = Deferred::&lt;u32, &amp;str&gt;::new(|| { Ok(4u32) });
 let d5 = Deferred::&lt;u32, &amp;str&gt;::new(|| { Ok(5u32) });
 
 let promise = Deferred::vec_to_promise(vec![d1,d2,d3], ControlFlow::Parallel);
-
-// Only d1, d2 and d3 are being executed at this thime.
+// Only d1, d2 and d3 are being executed at this time.
 
 let value_b = d_a.to_promise().then(|res_a| {
     assert_eq!(res_a, &quot;a&quot;);
