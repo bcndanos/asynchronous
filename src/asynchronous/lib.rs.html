@@ -524,8 +524,8 @@ use asynchronous::Promise;
 use asynchronous::Deferred;
 use asynchronous::ControlFlow;
 
-let d_a = Deferred::&lt;&amp;str, &amp;str&gt;::new(|| { Ok(&quot;a&quot;) }); // Execution delayed until transform to promise
-let p_b = Promise::&lt;&amp;str, &amp;str&gt;::new(|| { Ok(&quot;b&quot;) });  // Executed in this momment
+let d_a = Deferred::&lt;&amp;str, &amp;str&gt;::new(|| { Ok(&quot;a&quot;) });
+let p_b = Promise::&lt;&amp;str, &amp;str&gt;::new(|| { Ok(&quot;b&quot;) });  // Executed right now
 let d1 = Deferred::&lt;u32, &amp;str&gt;::new(|| { Ok(1u32) });
 let d2 = Deferred::&lt;u32, &amp;str&gt;::new(|| { Err(&quot;Error Mock&quot;) });
 let d3 = Deferred::&lt;u32, &amp;str&gt;::new(|| { Ok(3u32) });
