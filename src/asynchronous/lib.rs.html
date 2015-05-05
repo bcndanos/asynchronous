@@ -451,6 +451,7 @@
 <span id="409">409</span>
 <span id="410">410</span>
 <span id="411">411</span>
+<span id="412">412</span>
 </pre><pre class='rust '>
 <span class='doccomment'>/*!
 A **promise** based asynchronous library
@@ -500,10 +501,11 @@ let d3 = Deferred::&lt;u32, &amp;str&gt;::new(|| { Ok(3u32) });
 let d4 = Deferred::&lt;u32, &amp;str&gt;::new(|| { Ok(4u32) });
 let d5 = Deferred::&lt;u32, &amp;str&gt;::new(|| { Ok(5u32) });
 
-let promise_parallel = Deferred::vec_to_promise(vec![d1,d2,d3], ControlFlow::Parallel);
-let promise_series = Deferred::vec_to_promise(vec![d4,d5], ControlFlow::Series);
+let promise = Deferred::vec_to_promise(vec![d1,d2,d3], ControlFlow::Parallel);
 
-promise_parallel.then(|res| {
+// Only d1, d2 and d3 are being executed at this thime.
+
+promise.then(|res| {
     // Catch the result. In this case, tasks d4 and d5 never will be executed
     unreachable!();
     Ok(res)
@@ -512,7 +514,7 @@ promise_parallel.then(|res| {
     assert_eq!(error[0], Ok(1u32));
     assert_eq!(error[1], Err(&quot;Error Mock&quot;));
     assert_eq!(error[2], Ok(3u32));
-    promise_series.sync()
+    Deferred::vec_to_promise(vec![d4,d5], ControlFlow::Series).sync()
 }).finally_sync(|res| {   // res : Vec&lt;u32&gt;
     // Do something here    
     assert_eq!(res, vec![4u32, 5u32]);
