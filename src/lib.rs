@@ -17,19 +17,20 @@ This is a simple setup for a promise based execution:
 use asynchronous::Promise;
  
 Promise::new(|| {
-  // Do something in another thread
+  // Do something  
   let ret = 10.0 / 3.0;
   if ret > 0.0 { Ok(ret) } else { Err("Value Incorrect") }
 }).then(|res| {            // res has type f64
   // Do something if the previous result is correct
+  assert_eq!(res, 10.0 / 3.0);
   let res_int = res as u32 * 2;
   Ok(res_int)
 }).finally_sync(|res| {    // res has type u32
   // Catch a correct result
-  println!("Result produced: {:?}" , res);  // res is 6u32
+  assert_eq!(res, 6u32);
 }, |error| {
   // Catch an incorrect result
-  println!("Error produced: {:?} ", error);
+  unreachable!();
 });
 ``` 
 
@@ -40,7 +41,7 @@ use asynchronous::Deferred;
 use asynchronous::ControlFlow;
 
 let d1 = Deferred::<u32, &str>::new(|| { Ok(1u32) });
-let d2 = Deferred::<u32, &str>::new(|| { Err("Error") });
+let d2 = Deferred::<u32, &str>::new(|| { Err("Error Mock") });
 let d3 = Deferred::<u32, &str>::new(|| { Ok(3u32) });
 let d4 = Deferred::<u32, &str>::new(|| { Ok(4u32) });
 let d5 = Deferred::<u32, &str>::new(|| { Ok(5u32) });
@@ -50,14 +51,20 @@ let promise_series = Deferred::vec_to_promise(vec![d4,d5], ControlFlow::Series);
 
 promise_parallel.then(|res| {
     // Catch the result. In this case, tasks d4 and d5 never will be executed
+    unreachable!();
     Ok(res)
 }).fail(|error| {
     // Catch the error and execute another Promise
+    assert_eq!(error[0], Ok(1u32));
+    assert_eq!(error[1], Err("Error Mock"));
+    assert_eq!(error[2], Ok(3u32));
     promise_series.sync()
-}).finally_sync(|vector_results| {   // vector_results : Vec<u32>
+}).finally_sync(|res| {   // res : Vec<u32>
     // Do something here    
-}, |vector_errors| { // vector_errors : Vec<Result<u32,&str>>
+    assert_eq!(res, vec![4u32, 5u32]);
+}, |error| { // error : Vec<Result<u32,&str>>
     // Do something here.
+    unreachable!();
 });
 
 ``` 
