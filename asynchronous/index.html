@@ -43,7 +43,7 @@
     <section id='main' class="content mod">
 <h1 class='fqn'><span class='in-band'>Crate <a class='mod' href=''>asynchronous</a></span><span class='out-of-band'><span id='render-detail'>
             <a id="toggle-all-docs" href="#" title="collapse all docs">[&minus;]</a>
-        </span><a id='src-0' class='srclink' href='../src/asynchronous/lib.rs.html#1-439' title='goto source code'>[src]</a></span></h1>
+        </span><a id='src-0' class='srclink' href='../src/asynchronous/lib.rs.html#1-441' title='goto source code'>[src]</a></span></h1>
 <div class='docblock'><p>A <strong>promise</strong> based asynchronous library</p>
 
 <p>This library will provide an usefull way to invoke functions (clousures) in a <strong>Promise Style</strong>. A Promise 
@@ -95,11 +95,13 @@ a separated thread. </p>
 
 <span class='comment'>// Only d1, d2 and d3 are being executed at this thime.</span>
 
-<span class='kw'>let</span> <span class='ident'>value_b</span> <span class='op'>=</span> <span class='ident'>d_a</span>.<span class='ident'>to_promise</span>().<span class='ident'>then</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
-    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='string'>&quot;a&quot;</span>);
-    <span class='ident'>d_b</span>.<span class='ident'>to_promise</span>().<span class='ident'>sync</span>()
+<span class='kw'>let</span> <span class='ident'>value_b</span> <span class='op'>=</span> <span class='ident'>d_a</span>.<span class='ident'>to_promise</span>().<span class='ident'>then</span>(<span class='op'>|</span><span class='ident'>res_a</span><span class='op'>|</span> {
+    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res_a</span>, <span class='string'>&quot;a&quot;</span>);
+    <span class='ident'>d_b</span>.<span class='ident'>to_promise</span>().<span class='ident'>then</span>(<span class='kw'>move</span> <span class='op'>|</span><span class='ident'>res_b</span><span class='op'>|</span> {
+        <span class='prelude-val'>Ok</span>(<span class='ident'>res_a</span>.<span class='ident'>to_string</span>() <span class='op'>+</span> <span class='ident'>res_b</span>)
+    }).<span class='ident'>sync</span>()
 }).<span class='ident'>sync</span>().<span class='ident'>unwrap</span>();
-<span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>value_b</span>, <span class='string'>&quot;b&quot;</span>);
+<span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>value_b</span>, <span class='string'>&quot;ab&quot;</span>);
 
 <span class='ident'>promise</span>.<span class='ident'>then</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
     <span class='comment'>// Catch the result. In this case, tasks d4 and d5 never will be executed</span>

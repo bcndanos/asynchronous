@@ -479,6 +479,8 @@
 <span id="437">437</span>
 <span id="438">438</span>
 <span id="439">439</span>
+<span id="440">440</span>
+<span id="441">441</span>
 </pre><pre class='rust '>
 <span class='doccomment'>/*!
 A **promise** based asynchronous library
@@ -534,11 +536,13 @@ let promise = Deferred::vec_to_promise(vec![d1,d2,d3], ControlFlow::Parallel);
 
 // Only d1, d2 and d3 are being executed at this thime.
 
-let value_b = d_a.to_promise().then(|res| {
-    assert_eq!(res, &quot;a&quot;);
-    d_b.to_promise().sync()
+let value_b = d_a.to_promise().then(|res_a| {
+    assert_eq!(res_a, &quot;a&quot;);
+    d_b.to_promise().then(move |res_b| {
+        Ok(res_a.to_string() + res_b)
+    }).sync()
 }).sync().unwrap();
-assert_eq!(value_b, &quot;b&quot;);
+assert_eq!(value_b, &quot;ab&quot;);
 
 promise.then(|res| {
     // Catch the result. In this case, tasks d4 and d5 never will be executed
