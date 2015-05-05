@@ -1,9 +1,10 @@
 [package]
 name = "asynchronous"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["bcndanos <bcndanos@users.noreply.github.com>"]
 description = "Promises Q style and async"
 repository = "https://github.com/bcndanos/asynchronous"
+documentation = "http://bcndanos.github.io/asynchronous/asynchronous/"
 readme = "README.md"
 license = "GPL-3.0"
 
