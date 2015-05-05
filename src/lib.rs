@@ -1,3 +1,72 @@
+/*!
+A **promise** based asynchronous library
+
+This library will provide an usefull way to invoke functions (clousures) in a **Promise Style**. A Promise 
+is a Struct that represents the return value or the error that the funcion produces and it's executed in
+a separated thread. 
+
+[Project github page](https://github.com/bcndanos/asynchronous)
+
+This project is based on the [Q Promise](https://github.com/kriskowal/q) library for Node JS .
+
+# Examples
+
+This is a simple setup for a promise based execution:
+
+```rust
+use asynchronous::Promise;
+ 
+Promise::new(|| {
+  // Do something in another thread
+  let ret = 10.0 / 3.0;
+  if ret > 0.0 { Ok(ret) } else { Err("Value Incorrect") }
+}).then(|res| {            // res has type f64
+  // Do something if the previous result is correct
+  let res_int = res as u32 * 2;
+  Ok(res_int)
+}).finally_sync(|res| {    // res has type u32
+  // Catch a correct result
+  println!("Result produced: {:?}" , res);  // res is 6u32
+}, |error| {
+  // Catch an incorrect result
+  println!("Error produced: {:?} ", error);
+});
+``` 
+
+Using deferred execution of 3 tasks in Parallel and 2 tasks in Series:
+
+```rust
+use asynchronous::Deferred;
+use asynchronous::ControlFlow;
+
+let d1 = Deferred::<u32, &str>::new(|| { Ok(1u32) });
+let d2 = Deferred::<u32, &str>::new(|| { Err("Error") });
+let d3 = Deferred::<u32, &str>::new(|| { Ok(3u32) });
+let d4 = Deferred::<u32, &str>::new(|| { Ok(4u32) });
+let d5 = Deferred::<u32, &str>::new(|| { Ok(5u32) });
+
+let promise_parallel = Deferred::vec_to_promise(vec![d1,d2,d3], ControlFlow::Parallel);
+let promise_series = Deferred::vec_to_promise(vec![d4,d5], ControlFlow::Series);
+
+promise_parallel.then(|res| {
+    // Catch the result. In this case, tasks d4 and d5 never will be executed
+    Ok(res)
+}).fail(|error| {
+    // Catch the error and execute another Promise
+    promise_series.sync()
+}).finally_sync(|vector_results| {   // vector_results : Vec<u32>
+    // Do something here    
+}, |vector_errors| { // vector_errors : Vec<Result<u32,&str>>
+    // Do something here.
+});
+
+``` 
+
+TODO: ControlFlow::ParallelLimit(limit) => execution in parallel with a maximum of **limit** tasks executing at any time.
+
+*/
+
+
 use std::thread;
 use std::sync::{mpsc, Arc, Mutex, Condvar};
 
@@ -155,6 +224,7 @@ impl<T,E> Promise<T,E> where T: Send + 'static , E: Send + 'static {
 
 #[cfg(test)]
 mod test {
+    use std::sync::{Arc, Mutex};
     use std::thread;
     use super::*;   
 
@@ -229,30 +299,37 @@ mod test {
     }
 
     #[test]
-    fn deferred_in_series() {
-        // TODO: Acumulate string in Mutex to check serial
-        let d1 = Deferred::<u32, &str>::new(||{
-            thread::sleep_ms(200);
+    fn deferred_in_series() {        
+        let st = Arc::new(Mutex::new(String::new()));
+
+        let lock1 = st.clone();
+        let d1 = Deferred::<u32, &str>::new(move ||{            
+            thread::sleep_ms(200);            
+            lock1.lock().unwrap().push_str("Def1");
             Ok(1u32)
         });
-        let d2 = Deferred::<u32, &str>::new(|| {
+
+        let lock2 = st.clone();
+        let d2 = Deferred::<u32, &str>::new(move || {
             thread::sleep_ms(100);
+            lock2.lock().unwrap().push_str("Def2");            
             Ok(2u32)
         });
-        let d3 = Deferred::<u32, &str>::new(||{
+
+        let lock3 = st.clone();
+        let d3 = Deferred::<u32, &str>::new(move ||{
             thread::sleep_ms(200);
+            lock3.lock().unwrap().push_str("Def3");            
             Ok(3u32)
         });
+
         let d4 = Deferred::<u32, &str>::new(|| {
-            thread::sleep_ms(100);
             Ok(4u32)
         });
         let d5 = Deferred::<u32, &str>::new(|| {
-            thread::sleep_ms(100);
             Err("Error")            
         });
         let d6 = Deferred::<u32, &str>::new(|| {
-            thread::sleep_ms(100);
             Ok(6u32)
         });
 
@@ -262,6 +339,7 @@ mod test {
                 Ok(0u32)
             }).sync();        
         assert_eq!(r, Ok(0u32));
+        assert_eq!(*st.lock().unwrap(),"Def1Def2Def3");
 
         Deferred::vec_to_promise(vec![d4,d5,d6], ControlFlow::Series)
             .finally_sync(|res| {
@@ -275,29 +353,33 @@ mod test {
 
     #[test]
     fn deferred_in_parallel() {
-        // TODO: Acumulate string in Mutex to check parallel
-        let d1 = Deferred::<u32, &str>::new(||{
+        let st = Arc::new(Mutex::new(String::new()));
+
+        let lock1 = st.clone();
+        let d1 = Deferred::<u32, &str>::new(move ||{
             thread::sleep_ms(200);
+            lock1.lock().unwrap().push_str("Def1");
             Ok(1u32)
         });
-        let d2 = Deferred::<u32, &str>::new(|| {
-            thread::sleep_ms(100);
+        let lock2 = st.clone();
+        let d2 = Deferred::<u32, &str>::new(move || {
+            thread::sleep_ms(300);
+            lock2.lock().unwrap().push_str("Def2");
             Ok(2u32)
         });
-        let d3 = Deferred::<u32, &str>::new(||{
-            thread::sleep_ms(200);
+        let lock3 = st.clone();
+        let d3 = Deferred::<u32, &str>::new(move ||{
+            thread::sleep_ms(50);
+            lock3.lock().unwrap().push_str("Def3");
             Ok(3u32)
         });
         let d4 = Deferred::<u32, &str>::new(|| {
-            thread::sleep_ms(100);
             Ok(4u32)
         });
         let d5 = Deferred::<u32, &str>::new(|| {
-            thread::sleep_ms(100);
             Err("Error")            
         });
         let d6 = Deferred::<u32, &str>::new(|| {
-            thread::sleep_ms(100);
             Ok(6u32)
         });
 
@@ -307,6 +389,7 @@ mod test {
                 Ok(0u32)
             }).sync();        
         assert_eq!(r, Ok(0u32));
+        assert_eq!(*st.lock().unwrap(),"Def3Def1Def2");
         
         Deferred::vec_to_promise(vec![d4,d5,d6], ControlFlow::Parallel)
             .finally_sync(|res| {
