@@ -4,10 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="generator" content="rustdoc">
-    <meta name="description" content="API documentation for the Rust `asynchronous` crate.">
-    <meta name="keywords" content="rust, rustlang, rust-lang, asynchronous">
+    <meta name="description" content="API documentation for the Rust `ControlFlow` enum in crate `asynchronous`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, ControlFlow">
 
-    <title>asynchronous - Rust</title>
+    <title>asynchronous::ControlFlow - Rust</title>
 
     <link rel="stylesheet" type="text/css" href="../main.css">
 
@@ -26,7 +26,7 @@
 
     <section class="sidebar">
         
-        <p class='location'></p><script>window.sidebarCurrent = {name: 'asynchronous', ty: 'mod', relpath: '../'};</script>
+        <p class='location'><a href='index.html'>asynchronous</a></p><script>window.sidebarCurrent = {name: 'ControlFlow', ty: 'enum', relpath: ''};</script><script defer src="sidebar-items.js"></script>
     </section>
 
     <nav class="sub">
@@ -40,37 +40,15 @@
         </form>
     </nav>
 
-    <section id='main' class="content mod">
-<h1 class='fqn'><span class='in-band'>Crate <a class='mod' href=''>asynchronous</a></span><span class='out-of-band'><span id='render-detail'>
+    <section id='main' class="content enum">
+<h1 class='fqn'><span class='in-band'>Enum <a href='index.html'>asynchronous</a>::<wbr><a class='enum' href=''>ControlFlow</a></span><span class='out-of-band'><span id='render-detail'>
             <a id="toggle-all-docs" href="#" title="collapse all docs">[&minus;]</a>
-        </span><a id='src-0' class='srclink' href='../src/asynchronous/lib.rs.html#1-321' title='goto source code'>[src]</a></span></h1>
-<h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
-<table>
-                    <tr class=' module-item'>
-                        <td><a class='struct' href='struct.Deferred.html'
-                               title='asynchronous::Deferred'>Deferred</a></td>
-                        <td class='docblock short'>
-                             
-                        </td>
-                    </tr>
-                
-                    <tr class=' module-item'>
-                        <td><a class='struct' href='struct.Promise.html'
-                               title='asynchronous::Promise'>Promise</a></td>
-                        <td class='docblock short'>
-                             
-                        </td>
-                    </tr>
-                </table><h2 id='enums' class='section-header'><a href="#enums">Enums</a></h2>
-<table>
-                    <tr class=' module-item'>
-                        <td><a class='enum' href='enum.ControlFlow.html'
-                               title='asynchronous::ControlFlow'>ControlFlow</a></td>
-                        <td class='docblock short'>
-                             
-                        </td>
-                    </tr>
-                </table></section>
+        </span><a id='src-10' class='srclink' href='../src/asynchronous/lib.rs.html#4-8' title='goto source code'>[src]</a></span></h1>
+<pre class='rust enum'>pub enum ControlFlow {
+    Series,
+    Parallel,
+}</pre><h2 class='variants'>Variants</h2>
+<table><tr><td id='variant.Series'><code>Series</code></td><td></td></tr><tr><td id='variant.Parallel'><code>Parallel</code></td><td></td></tr></table></section>
     <section id='search' class="content hidden"></section>
 
     <section class="footer"></section>

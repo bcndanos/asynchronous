@@ -1,1 +1,1 @@
-initSidebarItems({"struct":[["Promise",""]]});
+initSidebarItems({"enum":[["ControlFlow",""]],"struct":[["Deferred",""],["Promise",""]]});
