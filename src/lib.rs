@@ -130,6 +130,37 @@ impl<T,E> Deferred<T,E> where T: Send + 'static , E: Send + 'static {
         }
     }
 
+    /// Chain a deferred to another deferred. 
+    ///
+    /// ```rust
+    /// let deferred = asynchronous::Deferred::new(|| {
+    ///    // Do something  
+    ///    if true { Ok("value a") } else { Err("Error description") }
+    /// }).chain(|res| {
+    ///    assert_eq!(res.unwrap(), "value a");
+    ///    if true { Ok("value b") } else { Err("Error description") }
+    /// });        
+    /// ``` 
+    pub fn chain<F,TT,EE>(self, f:F) -> Deferred<TT,EE> 
+        where   TT: Send + 'static, EE : Send + 'static,         
+                F : Send + 'static + FnOnce(Result<T,E>) -> Result<TT,EE> {
+        let (tx,rx) = mpsc::channel();
+        let pair = Arc::new((Mutex::new(false), Condvar::new()));
+        let pair_c = pair.clone();
+        thread::spawn(move|| {
+            // wait for the thread to start up
+            let &(ref lock, ref cvar) = &*pair_c;
+            let mut started = lock.lock().unwrap();    
+            while !*started {  started = cvar.wait(started).unwrap(); }            
+            self.unlock();            
+            tx.send(f(self.receiver.recv().unwrap()))
+        });
+        Deferred::<TT,EE> {
+            starter   : pair,
+            receiver  : rx
+        }
+    }
+
     /// Executes the task stored and returns a Promise
     ///
     /// ```rust
@@ -532,6 +563,8 @@ mod test {
 
         let d4 = Deferred::<u32, &str>::new(|| {
             Ok(4u32)
+        }).chain(|res| {
+            Ok(res.unwrap() * 3)
         });
         let d5 = Deferred::<u32, &str>::new(|| {
             Err("Error")            
@@ -553,7 +586,7 @@ mod test {
                 unreachable!("Res: {:?}", res);
             }, |errors| {
                 assert_eq!(errors.len(), 2);
-                assert_eq!(errors[0], Ok(4u32));
+                assert_eq!(errors[0], Ok(12u32));
                 assert_eq!(errors[1], Err("Error"));
             });
     }
@@ -675,6 +708,25 @@ mod test {
             }, |err| {
                 unreachable!("{:?}", err);
             });
+    }
+
+    #[test]
+    fn deferred_chained() {
+        let res = Deferred::<String, &str>::new(||{
+            thread::sleep_ms(50);
+            if true { Ok("first".to_string()) } else { Err("Nothing") }
+        }).chain(|res| {  
+            let mut v = res.unwrap();      
+            assert_eq!(v, "first");
+            thread::sleep_ms(50);
+            if true { 
+                v.push_str("second"); 
+                Ok(v)
+            } else { 
+                Err("Nothing") 
+            }
+        }).to_promise().sync().unwrap();
+        assert_eq!(res, "firstsecond");
     }
 
     #[test]
