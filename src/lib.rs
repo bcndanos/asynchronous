@@ -141,7 +141,7 @@ impl<T,E> Deferred<T,E> where T: Send + 'static , E: Send + 'static {
     ///    if true { Ok("value b") } else { Err("Error description") }
     /// });        
     /// ``` 
-    pub fn chain<F,TT,EE>(self, f:F) -> Deferred<TT,EE> 
+    pub fn chain<TT,EE,F>(self, f:F) -> Deferred<TT,EE> 
         where   TT: Send + 'static, EE : Send + 'static,         
                 F : Send + 'static + FnOnce(Result<T,E>) -> Result<TT,EE> {
         let (tx,rx) = mpsc::channel();
