@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["ControlFlow",""]],"struct":[["Deferred",""],["Promise",""]]});
+initSidebarItems({"enum":[["ControlFlow","Different possibilities for asynchronous treatment of vectors"]],"struct":[["Deferred","Stores a function and delays its execution until it's transform to a promise. T : Type of value returned E : Type of error returned"],["Promise","Stores a result of previous execution tasks. T : Type of value returned E : Type of error returned"]]});

@@ -43,7 +43,7 @@
     <section id='main' class="content mod">
 <h1 class='fqn'><span class='in-band'>Crate <a class='mod' href=''>asynchronous</a></span><span class='out-of-band'><span id='render-detail'>
             <a id="toggle-all-docs" href="#" title="collapse all docs">[&minus;]</a>
-        </span><a id='src-0' class='srclink' href='../src/asynchronous/lib.rs.html#1-439' title='goto source code'>[src]</a></span></h1>
+        </span><a id='src-0' class='srclink' href='../src/asynchronous/lib.rs.html#1-698' title='goto source code'>[src]</a></span></h1>
 <div class='docblock'><p>A <strong>promise</strong> based asynchronous library</p>
 
 <p>This library will provide an usefull way to invoke functions (clousures) in a <strong>Promise Style</strong>. A Promise 
@@ -119,15 +119,16 @@ a separated thread. </p>
     <span class='macro'>unreachable</span><span class='macro'>!</span>();
 });
 </pre>
-
-<p>TODO: ControlFlow::ParallelLimit(limit) =&gt; execution in parallel with a maximum of <strong>limit</strong> tasks executing at any time.</p>
 </div><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
 <table>
                     <tr class=' module-item'>
                         <td><a class='struct' href='struct.Deferred.html'
                                title='asynchronous::Deferred'>Deferred</a></td>
                         <td class='docblock short'>
-                             
+                             <p>Stores a function and delays its execution until it&#39;s transform to a promise.
+T : Type of value returned
+E : Type of error returned</p>
+
                         </td>
                     </tr>
                 
@@ -135,7 +136,10 @@ a separated thread. </p>
                         <td><a class='struct' href='struct.Promise.html'
                                title='asynchronous::Promise'>Promise</a></td>
                         <td class='docblock short'>
-                             
+                             <p>Stores a result of previous execution tasks.
+T : Type of value returned
+E : Type of error returned</p>
+
                         </td>
                     </tr>
                 </table><h2 id='enums' class='section-header'><a href="#enums">Enums</a></h2>
@@ -144,7 +148,8 @@ a separated thread. </p>
                         <td><a class='enum' href='enum.ControlFlow.html'
                                title='asynchronous::ControlFlow'>ControlFlow</a></td>
                         <td class='docblock short'>
-                             
+                             <p>Different possibilities for asynchronous treatment of vectors</p>
+
                         </td>
                     </tr>
                 </table></section>

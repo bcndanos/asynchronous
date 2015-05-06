@@ -43,13 +43,45 @@
     <section id='main' class="content struct">
 <h1 class='fqn'><span class='in-band'>Struct <a href='index.html'>asynchronous</a>::<wbr><a class='struct' href=''>Deferred</a></span><span class='out-of-band'><span id='render-detail'>
             <a id="toggle-all-docs" href="#" title="collapse all docs">[&minus;]</a>
-        </span><a id='src-14' class='srclink' href='../src/asynchronous/lib.rs.html#95-98' title='goto source code'>[src]</a></span></h1>
+        </span><a id='src-19' class='srclink' href='../src/asynchronous/lib.rs.html#101-104' title='goto source code'>[src]</a></span></h1>
 <pre class='rust struct'>pub struct Deferred&lt;T, E&gt; {
     // some fields omitted
-}</pre><h2 id='methods'>Methods</h2><h3 class='impl'><code>impl&lt;T, E&gt; <a class='struct' href='../asynchronous/struct.Deferred.html' title='asynchronous::Deferred'>Deferred</a>&lt;T, E&gt; <span class='where'>where T: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static, E: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static</span></code></h3><div class='impl-items'><h4 id='method.new' class='method'><code>fn <a href='#method.new' class='fnname'>new</a>&lt;F&gt;(f: F) -&gt; <a class='struct' href='../asynchronous/struct.Deferred.html' title='asynchronous::Deferred'>Deferred</a>&lt;T, E&gt; <span class='where'>where F: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static + <a class='trait' href='http://doc.rust-lang.org/nightly/core/ops/trait.FnOnce.html' title='core::ops::FnOnce'>FnOnce</a>() -&gt; <a class='enum' href='http://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;T, E&gt;</span></code></h4>
-<h4 id='method.to_promise' class='method'><code>fn <a href='#method.to_promise' class='fnname'>to_promise</a>(self) -&gt; <a class='struct' href='../asynchronous/struct.Promise.html' title='asynchronous::Promise'>Promise</a>&lt;T, E&gt;</code></h4>
-<h4 id='method.vec_to_promise' class='method'><code>fn <a href='#method.vec_to_promise' class='fnname'>vec_to_promise</a>(vector: <a class='struct' href='http://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a class='struct' href='../asynchronous/struct.Deferred.html' title='asynchronous::Deferred'>Deferred</a>&lt;T, E&gt;&gt;, control: <a class='enum' href='../asynchronous/enum.ControlFlow.html' title='asynchronous::ControlFlow'>ControlFlow</a>) -&gt; <a class='struct' href='../asynchronous/struct.Promise.html' title='asynchronous::Promise'>Promise</a>&lt;<a class='struct' href='http://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;T&gt;, <a class='struct' href='http://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a class='enum' href='http://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;T, E&gt;&gt;&gt;</code></h4>
-</div></section>
+}</pre><div class='docblock'><p>Stores a function and delays its execution until it&#39;s transform to a promise.
+T : Type of value returned
+E : Type of error returned</p>
+</div><h2 id='methods'>Methods</h2><h3 class='impl'><code>impl&lt;T, E&gt; <a class='struct' href='../asynchronous/struct.Deferred.html' title='asynchronous::Deferred'>Deferred</a>&lt;T, E&gt; <span class='where'>where T: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static, E: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static</span></code></h3><div class='impl-items'><h4 id='method.new' class='method'><code>fn <a href='#method.new' class='fnname'>new</a>&lt;F&gt;(f: F) -&gt; <a class='struct' href='../asynchronous/struct.Deferred.html' title='asynchronous::Deferred'>Deferred</a>&lt;T, E&gt; <span class='where'>where F: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static + <a class='trait' href='http://doc.rust-lang.org/nightly/core/ops/trait.FnOnce.html' title='core::ops::FnOnce'>FnOnce</a>() -&gt; <a class='enum' href='http://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;T, E&gt;</span></code></h4>
+<div class='docblock'><p>Create a new task in deferred.</p>
+<pre id='rust-example-rendered' class='rust '>
+<span class='kw'>let</span> <span class='ident'>deferred</span> <span class='op'>=</span> <span class='ident'>asynchronous</span>::<span class='ident'>Deferred</span>::<span class='ident'>new</span>(<span class='op'>||</span> {
+   <span class='comment'>// Do something  </span>
+   <span class='kw'>if</span> <span class='boolval'>true</span> { <span class='prelude-val'>Ok</span>(<span class='string'>&quot;value a&quot;</span>) } <span class='kw'>else</span> { <span class='prelude-val'>Err</span>(<span class='string'>&quot;Error description&quot;</span>) }
+});
+<span class='comment'>// At this point &quot;deferred&quot; is not executed</span>
+</pre>
+</div><h4 id='method.to_promise' class='method'><code>fn <a href='#method.to_promise' class='fnname'>to_promise</a>(self) -&gt; <a class='struct' href='../asynchronous/struct.Promise.html' title='asynchronous::Promise'>Promise</a>&lt;T, E&gt;</code></h4>
+<div class='docblock'><p>Executes the task stored and returns a Promise</p>
+<pre id='rust-example-rendered' class='rust '>
+<span class='kw'>let</span> <span class='ident'>deferred</span> <span class='op'>=</span> <span class='ident'>asynchronous</span>::<span class='ident'>Deferred</span>::<span class='ident'>new</span>(<span class='op'>||</span> {
+   <span class='comment'>// Do something  </span>
+   <span class='kw'>if</span> <span class='boolval'>true</span> { <span class='prelude-val'>Ok</span>(<span class='string'>&quot;value a&quot;</span>) } <span class='kw'>else</span> { <span class='prelude-val'>Err</span>(<span class='string'>&quot;Error description&quot;</span>) }
+});
+<span class='ident'>deferred</span>.<span class='ident'>to_promise</span>();
+<span class='comment'>// At this point &quot;deferred&quot; is executing</span>
+</pre>
+</div><h4 id='method.vec_to_promise' class='method'><code>fn <a href='#method.vec_to_promise' class='fnname'>vec_to_promise</a>(vector: <a class='struct' href='http://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a class='struct' href='../asynchronous/struct.Deferred.html' title='asynchronous::Deferred'>Deferred</a>&lt;T, E&gt;&gt;, control: <a class='enum' href='../asynchronous/enum.ControlFlow.html' title='asynchronous::ControlFlow'>ControlFlow</a>) -&gt; <a class='struct' href='../asynchronous/struct.Promise.html' title='asynchronous::Promise'>Promise</a>&lt;<a class='struct' href='http://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;T&gt;, <a class='struct' href='http://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a class='enum' href='http://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;T, E&gt;&gt;&gt;</code></h4>
+<div class='docblock'><p>Executes a vector of tasks and returns a Promise with a vector of values in case that all tasks ended ok.
+If there&#39;s one or more tasks with error, the promise fails and returns a vector with all the Results.</p>
+<pre id='rust-example-rendered' class='rust '>
+<span class='kw'>use</span> <span class='ident'>asynchronous</span>::<span class='ident'>Deferred</span>;
+<span class='kw'>use</span> <span class='ident'>asynchronous</span>::<span class='ident'>ControlFlow</span>;
+ 
+<span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>vec_deferred</span> <span class='op'>=</span> <span class='ident'>Vec</span>::<span class='ident'>new</span>();
+<span class='kw'>for</span> <span class='ident'>i</span> <span class='kw'>in</span> <span class='number'>0</span>..<span class='number'>5</span> { <span class='ident'>vec_deferred</span>.<span class='ident'>push</span>(<span class='ident'>Deferred</span>::<span class='op'>&lt;</span>_,<span class='kw-2'>&amp;</span><span class='ident'>str</span><span class='op'>&gt;</span>::<span class='ident'>new</span>(<span class='kw'>move</span> <span class='op'>||</span> <span class='prelude-val'>Ok</span>(<span class='ident'>i</span>) )) }
+<span class='kw'>let</span> <span class='ident'>promise</span> <span class='op'>=</span> <span class='ident'>Deferred</span>::<span class='ident'>vec_to_promise</span>(<span class='ident'>vec_deferred</span>, <span class='ident'>ControlFlow</span>::<span class='ident'>ParallelCPUS</span>);
+<span class='comment'>// At this point all tasks in &quot;vec_deferred&quot; are executing</span>
+<span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>promise</span>.<span class='ident'>sync</span>().<span class='ident'>unwrap</span>(), <span class='macro'>vec</span><span class='macro'>!</span>[<span class='number'>0</span>,<span class='number'>1</span>,<span class='number'>2</span>,<span class='number'>3</span>,<span class='number'>4</span>]);
+</pre>
+</div></div></section>
     <section id='search' class="content hidden"></section>
 
     <section class="footer"></section>
