@@ -11,6 +11,10 @@
 
 #Overview
 
-A version of [q promises](https://github.com/kriskowal/q) in Rust. 
+This library will provide an usefull way to invoke functions (clousures) in a **Promise Style**. A Promise 
+is a Struct that represents the return value or the error that the funcion produces and it's executed in
+a separated thread. 
 
-TODO: More information and Examples
+[Project github page](https://github.com/bcndanos/asynchronous)
+
+This project is based on the [Q Promise](https://github.com/kriskowal/q) library for Node JS .
