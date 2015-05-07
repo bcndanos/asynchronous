@@ -1,7 +1,7 @@
 [package]
 name = "asynchronous"
-version = "0.3.2"
-authors = ["bcndanos <bcndanos@users.noreply.github.com>"]
+version = "0.3.3"
+authors = ["bcndanos <rinnegatobcn@gmail.com>"]
 description = "Promises Q style and async"
 repository = "https://github.com/bcndanos/asynchronous"
 documentation = "http://bcndanos.github.io/asynchronous/asynchronous/"

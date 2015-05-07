@@ -20,7 +20,7 @@ Promise::new(|| {
   // Do something  
   let ret = 10.0 / 3.0;
   if ret > 0.0 { Ok(ret) } else { Err("Value Incorrect") }
-}).then(|res| {            // res has type f64
+}).success(|res| {            // res has type f64
   // Do something if the previous result is correct
   assert_eq!(res, 10.0 / 3.0);
   let res_int = res as u32 * 2;
@@ -52,15 +52,15 @@ let d5 = Deferred::<u32, &str>::new(|| { Ok(5u32) });
 let promise = Deferred::vec_to_promise(vec![d1,d2,d3], ControlFlow::Parallel);
 // Only d1, d2 and d3 are being executed at this time.
 
-let value_b = d_a.to_promise().then(|res_a| {
+let value_b = d_a.to_promise().success(|res_a| {
     assert_eq!(res_a, "a");
-    p_b.then(move |res_b| {
+    p_b.success(move |res_b| {
         Ok(res_a.to_string() + res_b)
     }).sync()
 }).sync().unwrap();
 assert_eq!(value_b, "ab");
 
-promise.then(|res| {
+promise.success(|res| {
     // Catch the result. In this case, tasks d4 and d5 never will be executed
     unreachable!();
     Ok(res)
@@ -354,21 +354,52 @@ impl<T,E> Promise<T,E> where T: Send + 'static , E: Send + 'static {
         Promise::<Vec<T>, Vec<Result<T,E>>> { receiver: rx }
     }
 
+    /// Executes only one of the two functions received depending on the result of the previous promise (Ok or Err). 
+    /// Returns a new Promise
+    ///
+    /// ```rust
+    /// let r = asynchronous::Promise::new(|| {
+    ///    if false { Ok(1.23) } else { Err("Final error")}
+    /// }).then(|res| {
+    ///    unreachable!();
+    ///    assert_eq!(res, 1.23);
+    ///    Ok(34)
+    /// }, |err| {
+    ///    assert_eq!(err, "Final error");
+    ///    if true { Ok(35) } else { Err(44u64)}
+    /// }).sync();
+    /// assert_eq!(r, Ok(35));
+    /// ```   
+    pub fn then<TT,EE,FT,FE>(self,ft:FT,fe:FE) -> Promise<TT,EE> 
+        where   TT: Send + 'static, EE: Send + 'static,
+                FT: Send + 'static + FnOnce(T) -> Result<TT,EE>, 
+                FE: Send + 'static + FnOnce(E) -> Result<TT,EE> {
+        let (tx,rx) = mpsc::channel();
+        thread::spawn(move || { 
+            let res = self.receiver.recv().unwrap();
+            match res {
+                Ok(t) => tx.send(ft(t)),
+                Err(e) => tx.send(fe(e))
+            }
+        });
+        Promise::<TT,EE> { receiver: rx }
+    }
+
     /// Executes a new task if the result of the previous promise is Ok. It may return a new type in a correct result (Ok),
     /// but it must return the same type of error of its previous promise.
     ///
     /// ```rust
     /// asynchronous::Promise::new(|| {
     ///    Ok(1.23)
-    /// }).then(|res| {
+    /// }).success(|res| {
     ///    assert_eq!(res, 1.23);
     ///    Ok(34)
-    /// }).then(|res| {
+    /// }).success(|res| {
     ///    assert_eq!(res, 34);
     ///    if true { Ok(res) } else { Err("Final error")}
     /// }).sync();
     /// ```   
-    pub fn then<TT,F>(self,f:F) -> Promise<TT,E> where F: Send + 'static + FnOnce(T) -> Result<TT,E>, TT: Send + 'static {      
+    pub fn success<TT,F>(self,f:F) -> Promise<TT,E> where F: Send + 'static + FnOnce(T) -> Result<TT,E>, TT: Send + 'static {      
         let (tx,rx) = mpsc::channel();
         thread::spawn(move || { 
             let res = self.receiver.recv().unwrap();
@@ -386,7 +417,7 @@ impl<T,E> Promise<T,E> where T: Send + 'static , E: Send + 'static {
     /// ```rust
     /// asynchronous::Promise::new(|| {
     ///    Err(32)
-    /// }).then(|res| {
+    /// }).success(|res| {
     ///    unreachable!();
     ///    Ok(res)
     /// }).fail(|err| {
@@ -474,7 +505,7 @@ mod test {
                     0 => Err("Division by zero"),
                     _ => Ok(x * 2)
                 }
-            }).then(move |res| {
+            }).success(move |res| {
                 assert_eq!(res, x * 2);
                 Ok(res * 2) 
             }).fail(|error| {
@@ -574,7 +605,7 @@ mod test {
         });
 
         let r = Deferred::vec_to_promise(vec![d1, d2, d3], ControlFlow::Series)
-            .then(|res| {
+            .success(|res| {
                 assert_eq!(vec![1u32,2u32, 3u32], res);
                 Ok(0u32)
             }).sync();        
@@ -624,7 +655,7 @@ mod test {
         });
 
         let r = Deferred::vec_to_promise(vec![d1, d2, d3], ControlFlow::Parallel)
-            .then(|res| {
+            .success(|res| {
                 assert_eq!(vec![1u32,2u32, 3u32], res);
                 Ok(0u32)
             }).sync();        
@@ -679,7 +710,7 @@ mod test {
         });
 
         let r = Deferred::vec_to_promise(vec![d1, d2, d3, d4], ControlFlow::ParallelLimit(2))
-            .then(|res| {
+            .success(|res| {
                 assert_eq!(vec![1u32,2u32, 3u32,4u32], res);
                 Ok(0u32)
             }).sync();        
@@ -736,13 +767,13 @@ mod test {
             Promise::new(|| {
                 Promise::new(|| {
                     Ok(4)
-                }).then(|res| {
+                }).success(|res| {
                     Ok(res + 2)
                 }).sync()
-            }).then(|res| {
+            }).success(|res| {
                 Ok(res * 7)
             }).sync()
-        }).then(|res| {
+        }).success(|res| {
             Ok(res + 5)
         }).sync().unwrap();
         assert_eq!(res, 47);

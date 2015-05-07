@@ -43,15 +43,15 @@ fn main() {
 		} else {
 			Ok(12)
 		}
-	}).then(move |res| {
-		println!("Inside then: {}", res);
+	}).success(move |res| {
+		println!("Inside success: {}", res);
 		Ok(res * exter_value)
 	}).fail(|error| {
 		println!("Inside fail: {}", error);
 		Promise::new(|| {
 			thread::sleep_ms(500); // Simulate async work
 			println!("Recovery from fail!!!");
-			promise_mock(6, 2).then(|res| {			
+			promise_mock(6, 2).success(|res| {			
 				println!("Result mock division: {}", res);
 				thread::sleep_ms(500); // Simulate async work
 				Ok(res as u32)
