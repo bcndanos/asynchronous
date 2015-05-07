@@ -84,16 +84,32 @@ E : Type of error returned</p>
 <span class='kw'>let</span> <span class='ident'>res</span> <span class='op'>=</span> <span class='ident'>Promise</span>::<span class='ident'>all</span>(<span class='ident'>vec_promises</span>).<span class='ident'>sync</span>().<span class='ident'>unwrap</span>();
 <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='macro'>vec</span><span class='macro'>!</span>[<span class='number'>0</span>,<span class='number'>1</span>,<span class='number'>2</span>,<span class='number'>3</span>,<span class='number'>4</span>]);
 </pre>
-</div><h4 id='method.then' class='method'><code>fn <a href='#method.then' class='fnname'>then</a>&lt;TT, F&gt;(self, f: F) -&gt; <a class='struct' href='../asynchronous/struct.Promise.html' title='asynchronous::Promise'>Promise</a>&lt;TT, E&gt; <span class='where'>where F: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static + <a class='trait' href='http://doc.rust-lang.org/nightly/core/ops/trait.FnOnce.html' title='core::ops::FnOnce'>FnOnce</a>(T) -&gt; <a class='enum' href='http://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;TT, E&gt;, TT: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static</span></code></h4>
+</div><h4 id='method.then' class='method'><code>fn <a href='#method.then' class='fnname'>then</a>&lt;TT, EE, FT, FE&gt;(self, ft: FT, fe: FE) -&gt; <a class='struct' href='../asynchronous/struct.Promise.html' title='asynchronous::Promise'>Promise</a>&lt;TT, EE&gt; <span class='where'>where TT: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static, EE: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static, FT: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static + <a class='trait' href='http://doc.rust-lang.org/nightly/core/ops/trait.FnOnce.html' title='core::ops::FnOnce'>FnOnce</a>(T) -&gt; <a class='enum' href='http://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;TT, EE&gt;, FE: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static + <a class='trait' href='http://doc.rust-lang.org/nightly/core/ops/trait.FnOnce.html' title='core::ops::FnOnce'>FnOnce</a>(E) -&gt; <a class='enum' href='http://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;TT, EE&gt;</span></code></h4>
+<div class='docblock'><p>Executes only one of the two functions received depending on the result of the previous promise (Ok or Err).
+Returns a new Promise</p>
+<pre id='rust-example-rendered' class='rust '>
+<span class='kw'>let</span> <span class='ident'>r</span> <span class='op'>=</span> <span class='ident'>asynchronous</span>::<span class='ident'>Promise</span>::<span class='ident'>new</span>(<span class='op'>||</span> {
+   <span class='kw'>if</span> <span class='boolval'>false</span> { <span class='prelude-val'>Ok</span>(<span class='number'>1.23</span>) } <span class='kw'>else</span> { <span class='prelude-val'>Err</span>(<span class='string'>&quot;Final error&quot;</span>)}
+}).<span class='ident'>then</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
+   <span class='macro'>unreachable</span><span class='macro'>!</span>();
+   <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='number'>1.23</span>);
+   <span class='prelude-val'>Ok</span>(<span class='number'>34</span>)
+}, <span class='op'>|</span><span class='ident'>err</span><span class='op'>|</span> {
+   <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>err</span>, <span class='string'>&quot;Final error&quot;</span>);
+   <span class='kw'>if</span> <span class='boolval'>true</span> { <span class='prelude-val'>Ok</span>(<span class='number'>35</span>) } <span class='kw'>else</span> { <span class='prelude-val'>Err</span>(<span class='number'>44u64</span>)}
+}).<span class='ident'>sync</span>();
+<span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>r</span>, <span class='prelude-val'>Ok</span>(<span class='number'>35</span>));
+</pre>
+</div><h4 id='method.success' class='method'><code>fn <a href='#method.success' class='fnname'>success</a>&lt;TT, F&gt;(self, f: F) -&gt; <a class='struct' href='../asynchronous/struct.Promise.html' title='asynchronous::Promise'>Promise</a>&lt;TT, E&gt; <span class='where'>where F: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static + <a class='trait' href='http://doc.rust-lang.org/nightly/core/ops/trait.FnOnce.html' title='core::ops::FnOnce'>FnOnce</a>(T) -&gt; <a class='enum' href='http://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;TT, E&gt;, TT: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static</span></code></h4>
 <div class='docblock'><p>Executes a new task if the result of the previous promise is Ok. It may return a new type in a correct result (Ok),
 but it must return the same type of error of its previous promise.</p>
 <pre id='rust-example-rendered' class='rust '>
 <span class='ident'>asynchronous</span>::<span class='ident'>Promise</span>::<span class='ident'>new</span>(<span class='op'>||</span> {
    <span class='prelude-val'>Ok</span>(<span class='number'>1.23</span>)
-}).<span class='ident'>then</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
+}).<span class='ident'>success</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='number'>1.23</span>);
    <span class='prelude-val'>Ok</span>(<span class='number'>34</span>)
-}).<span class='ident'>then</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
+}).<span class='ident'>success</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='number'>34</span>);
    <span class='kw'>if</span> <span class='boolval'>true</span> { <span class='prelude-val'>Ok</span>(<span class='ident'>res</span>) } <span class='kw'>else</span> { <span class='prelude-val'>Err</span>(<span class='string'>&quot;Final error&quot;</span>)}
 }).<span class='ident'>sync</span>();
@@ -104,7 +120,7 @@ but it must return the same type of error of its previous promise.</p>
 <pre id='rust-example-rendered' class='rust '>
 <span class='ident'>asynchronous</span>::<span class='ident'>Promise</span>::<span class='ident'>new</span>(<span class='op'>||</span> {
    <span class='prelude-val'>Err</span>(<span class='number'>32</span>)
-}).<span class='ident'>then</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
+}).<span class='ident'>success</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
    <span class='macro'>unreachable</span><span class='macro'>!</span>();
    <span class='prelude-val'>Ok</span>(<span class='ident'>res</span>)
 }).<span class='ident'>fail</span>(<span class='op'>|</span><span class='ident'>err</span><span class='op'>|</span> {

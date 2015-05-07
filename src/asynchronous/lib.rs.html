@@ -790,6 +790,37 @@
 <span id="748">748</span>
 <span id="749">749</span>
 <span id="750">750</span>
+<span id="751">751</span>
+<span id="752">752</span>
+<span id="753">753</span>
+<span id="754">754</span>
+<span id="755">755</span>
+<span id="756">756</span>
+<span id="757">757</span>
+<span id="758">758</span>
+<span id="759">759</span>
+<span id="760">760</span>
+<span id="761">761</span>
+<span id="762">762</span>
+<span id="763">763</span>
+<span id="764">764</span>
+<span id="765">765</span>
+<span id="766">766</span>
+<span id="767">767</span>
+<span id="768">768</span>
+<span id="769">769</span>
+<span id="770">770</span>
+<span id="771">771</span>
+<span id="772">772</span>
+<span id="773">773</span>
+<span id="774">774</span>
+<span id="775">775</span>
+<span id="776">776</span>
+<span id="777">777</span>
+<span id="778">778</span>
+<span id="779">779</span>
+<span id="780">780</span>
+<span id="781">781</span>
 </pre><pre class='rust '>
 <span class='doccomment'>/*!
 A **promise** based asynchronous library
@@ -813,7 +844,7 @@ Promise::new(|| {
   // Do something  
   let ret = 10.0 / 3.0;
   if ret &gt; 0.0 { Ok(ret) } else { Err(&quot;Value Incorrect&quot;) }
-}).then(|res| {            // res has type f64
+}).success(|res| {            // res has type f64
   // Do something if the previous result is correct
   assert_eq!(res, 10.0 / 3.0);
   let res_int = res as u32 * 2;
@@ -845,15 +876,15 @@ let d5 = Deferred::&lt;u32, &amp;str&gt;::new(|| { Ok(5u32) });
 let promise = Deferred::vec_to_promise(vec![d1,d2,d3], ControlFlow::Parallel);
 // Only d1, d2 and d3 are being executed at this time.
 
-let value_b = d_a.to_promise().then(|res_a| {
+let value_b = d_a.to_promise().success(|res_a| {
     assert_eq!(res_a, &quot;a&quot;);
-    p_b.then(move |res_b| {
+    p_b.success(move |res_b| {
         Ok(res_a.to_string() + res_b)
     }).sync()
 }).sync().unwrap();
 assert_eq!(value_b, &quot;ab&quot;);
 
-promise.then(|res| {
+promise.success(|res| {
     // Catch the result. In this case, tasks d4 and d5 never will be executed
     unreachable!();
     Ok(res)
@@ -1147,21 +1178,52 @@ promise.then(|res| {
         <span class='ident'>Promise</span>::<span class='op'>&lt;</span><span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>T</span><span class='op'>&gt;</span>, <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>T</span>,<span class='ident'>E</span><span class='op'>&gt;&gt;</span><span class='op'>&gt;</span> { <span class='ident'>receiver</span>: <span class='ident'>rx</span> }
     }
 
+    <span class='doccomment'>/// Executes only one of the two functions received depending on the result of the previous promise (Ok or Err). </span>
+    <span class='doccomment'>/// Returns a new Promise</span>
+    <span class='doccomment'>///</span>
+    <span class='doccomment'>/// ```rust</span>
+    <span class='doccomment'>/// let r = asynchronous::Promise::new(|| {</span>
+    <span class='doccomment'>///    if false { Ok(1.23) } else { Err(&quot;Final error&quot;)}</span>
+    <span class='doccomment'>/// }).then(|res| {</span>
+    <span class='doccomment'>///    unreachable!();</span>
+    <span class='doccomment'>///    assert_eq!(res, 1.23);</span>
+    <span class='doccomment'>///    Ok(34)</span>
+    <span class='doccomment'>/// }, |err| {</span>
+    <span class='doccomment'>///    assert_eq!(err, &quot;Final error&quot;);</span>
+    <span class='doccomment'>///    if true { Ok(35) } else { Err(44u64)}</span>
+    <span class='doccomment'>/// }).sync();</span>
+    <span class='doccomment'>/// assert_eq!(r, Ok(35));</span>
+    <span class='doccomment'>/// ```   </span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>then</span><span class='op'>&lt;</span><span class='ident'>TT</span>,<span class='ident'>EE</span>,<span class='ident'>FT</span>,<span class='ident'>FE</span><span class='op'>&gt;</span>(<span class='self'>self</span>,<span class='ident'>ft</span>:<span class='ident'>FT</span>,<span class='ident'>fe</span>:<span class='ident'>FE</span>) <span class='op'>-&gt;</span> <span class='ident'>Promise</span><span class='op'>&lt;</span><span class='ident'>TT</span>,<span class='ident'>EE</span><span class='op'>&gt;</span> 
+        <span class='kw'>where</span>   <span class='ident'>TT</span>: <span class='ident'>Send</span> <span class='op'>+</span> <span class='lifetime'>&#39;static</span>, <span class='ident'>EE</span>: <span class='ident'>Send</span> <span class='op'>+</span> <span class='lifetime'>&#39;static</span>,
+                <span class='ident'>FT</span>: <span class='ident'>Send</span> <span class='op'>+</span> <span class='lifetime'>&#39;static</span> <span class='op'>+</span> <span class='ident'>FnOnce</span>(<span class='ident'>T</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>TT</span>,<span class='ident'>EE</span><span class='op'>&gt;</span>, 
+                <span class='ident'>FE</span>: <span class='ident'>Send</span> <span class='op'>+</span> <span class='lifetime'>&#39;static</span> <span class='op'>+</span> <span class='ident'>FnOnce</span>(<span class='ident'>E</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>TT</span>,<span class='ident'>EE</span><span class='op'>&gt;</span> {
+        <span class='kw'>let</span> (<span class='ident'>tx</span>,<span class='ident'>rx</span>) <span class='op'>=</span> <span class='ident'>mpsc</span>::<span class='ident'>channel</span>();
+        <span class='ident'>thread</span>::<span class='ident'>spawn</span>(<span class='kw'>move</span> <span class='op'>||</span> { 
+            <span class='kw'>let</span> <span class='ident'>res</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>receiver</span>.<span class='ident'>recv</span>().<span class='ident'>unwrap</span>();
+            <span class='kw'>match</span> <span class='ident'>res</span> {
+                <span class='prelude-val'>Ok</span>(<span class='ident'>t</span>) <span class='op'>=&gt;</span> <span class='ident'>tx</span>.<span class='ident'>send</span>(<span class='ident'>ft</span>(<span class='ident'>t</span>)),
+                <span class='prelude-val'>Err</span>(<span class='ident'>e</span>) <span class='op'>=&gt;</span> <span class='ident'>tx</span>.<span class='ident'>send</span>(<span class='ident'>fe</span>(<span class='ident'>e</span>))
+            }
+        });
+        <span class='ident'>Promise</span>::<span class='op'>&lt;</span><span class='ident'>TT</span>,<span class='ident'>EE</span><span class='op'>&gt;</span> { <span class='ident'>receiver</span>: <span class='ident'>rx</span> }
+    }
+
     <span class='doccomment'>/// Executes a new task if the result of the previous promise is Ok. It may return a new type in a correct result (Ok),</span>
     <span class='doccomment'>/// but it must return the same type of error of its previous promise.</span>
     <span class='doccomment'>///</span>
     <span class='doccomment'>/// ```rust</span>
     <span class='doccomment'>/// asynchronous::Promise::new(|| {</span>
     <span class='doccomment'>///    Ok(1.23)</span>
-    <span class='doccomment'>/// }).then(|res| {</span>
+    <span class='doccomment'>/// }).success(|res| {</span>
     <span class='doccomment'>///    assert_eq!(res, 1.23);</span>
     <span class='doccomment'>///    Ok(34)</span>
-    <span class='doccomment'>/// }).then(|res| {</span>
+    <span class='doccomment'>/// }).success(|res| {</span>
     <span class='doccomment'>///    assert_eq!(res, 34);</span>
     <span class='doccomment'>///    if true { Ok(res) } else { Err(&quot;Final error&quot;)}</span>
     <span class='doccomment'>/// }).sync();</span>
     <span class='doccomment'>/// ```   </span>
-    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>then</span><span class='op'>&lt;</span><span class='ident'>TT</span>,<span class='ident'>F</span><span class='op'>&gt;</span>(<span class='self'>self</span>,<span class='ident'>f</span>:<span class='ident'>F</span>) <span class='op'>-&gt;</span> <span class='ident'>Promise</span><span class='op'>&lt;</span><span class='ident'>TT</span>,<span class='ident'>E</span><span class='op'>&gt;</span> <span class='kw'>where</span> <span class='ident'>F</span>: <span class='ident'>Send</span> <span class='op'>+</span> <span class='lifetime'>&#39;static</span> <span class='op'>+</span> <span class='ident'>FnOnce</span>(<span class='ident'>T</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>TT</span>,<span class='ident'>E</span><span class='op'>&gt;</span>, <span class='ident'>TT</span>: <span class='ident'>Send</span> <span class='op'>+</span> <span class='lifetime'>&#39;static</span> {      
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>success</span><span class='op'>&lt;</span><span class='ident'>TT</span>,<span class='ident'>F</span><span class='op'>&gt;</span>(<span class='self'>self</span>,<span class='ident'>f</span>:<span class='ident'>F</span>) <span class='op'>-&gt;</span> <span class='ident'>Promise</span><span class='op'>&lt;</span><span class='ident'>TT</span>,<span class='ident'>E</span><span class='op'>&gt;</span> <span class='kw'>where</span> <span class='ident'>F</span>: <span class='ident'>Send</span> <span class='op'>+</span> <span class='lifetime'>&#39;static</span> <span class='op'>+</span> <span class='ident'>FnOnce</span>(<span class='ident'>T</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>TT</span>,<span class='ident'>E</span><span class='op'>&gt;</span>, <span class='ident'>TT</span>: <span class='ident'>Send</span> <span class='op'>+</span> <span class='lifetime'>&#39;static</span> {      
         <span class='kw'>let</span> (<span class='ident'>tx</span>,<span class='ident'>rx</span>) <span class='op'>=</span> <span class='ident'>mpsc</span>::<span class='ident'>channel</span>();
         <span class='ident'>thread</span>::<span class='ident'>spawn</span>(<span class='kw'>move</span> <span class='op'>||</span> { 
             <span class='kw'>let</span> <span class='ident'>res</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>receiver</span>.<span class='ident'>recv</span>().<span class='ident'>unwrap</span>();
@@ -1179,7 +1241,7 @@ promise.then(|res| {
     <span class='doccomment'>/// ```rust</span>
     <span class='doccomment'>/// asynchronous::Promise::new(|| {</span>
     <span class='doccomment'>///    Err(32)</span>
-    <span class='doccomment'>/// }).then(|res| {</span>
+    <span class='doccomment'>/// }).success(|res| {</span>
     <span class='doccomment'>///    unreachable!();</span>
     <span class='doccomment'>///    Ok(res)</span>
     <span class='doccomment'>/// }).fail(|err| {</span>
@@ -1267,7 +1329,7 @@ promise.then(|res| {
                     <span class='number'>0</span> <span class='op'>=&gt;</span> <span class='prelude-val'>Err</span>(<span class='string'>&quot;Division by zero&quot;</span>),
                     _ <span class='op'>=&gt;</span> <span class='prelude-val'>Ok</span>(<span class='ident'>x</span> <span class='op'>*</span> <span class='number'>2</span>)
                 }
-            }).<span class='ident'>then</span>(<span class='kw'>move</span> <span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
+            }).<span class='ident'>success</span>(<span class='kw'>move</span> <span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
                 <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='ident'>x</span> <span class='op'>*</span> <span class='number'>2</span>);
                 <span class='prelude-val'>Ok</span>(<span class='ident'>res</span> <span class='op'>*</span> <span class='number'>2</span>) 
             }).<span class='ident'>fail</span>(<span class='op'>|</span><span class='ident'>error</span><span class='op'>|</span> {
@@ -1367,7 +1429,7 @@ promise.then(|res| {
         });
 
         <span class='kw'>let</span> <span class='ident'>r</span> <span class='op'>=</span> <span class='ident'>Deferred</span>::<span class='ident'>vec_to_promise</span>(<span class='macro'>vec</span><span class='macro'>!</span>[<span class='ident'>d1</span>, <span class='ident'>d2</span>, <span class='ident'>d3</span>], <span class='ident'>ControlFlow</span>::<span class='ident'>Series</span>)
-            .<span class='ident'>then</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
+            .<span class='ident'>success</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
                 <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='macro'>vec</span><span class='macro'>!</span>[<span class='number'>1u32</span>,<span class='number'>2u32</span>, <span class='number'>3u32</span>], <span class='ident'>res</span>);
                 <span class='prelude-val'>Ok</span>(<span class='number'>0u32</span>)
             }).<span class='ident'>sync</span>();        
@@ -1417,7 +1479,7 @@ promise.then(|res| {
         });
 
         <span class='kw'>let</span> <span class='ident'>r</span> <span class='op'>=</span> <span class='ident'>Deferred</span>::<span class='ident'>vec_to_promise</span>(<span class='macro'>vec</span><span class='macro'>!</span>[<span class='ident'>d1</span>, <span class='ident'>d2</span>, <span class='ident'>d3</span>], <span class='ident'>ControlFlow</span>::<span class='ident'>Parallel</span>)
-            .<span class='ident'>then</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
+            .<span class='ident'>success</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
                 <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='macro'>vec</span><span class='macro'>!</span>[<span class='number'>1u32</span>,<span class='number'>2u32</span>, <span class='number'>3u32</span>], <span class='ident'>res</span>);
                 <span class='prelude-val'>Ok</span>(<span class='number'>0u32</span>)
             }).<span class='ident'>sync</span>();        
@@ -1472,7 +1534,7 @@ promise.then(|res| {
         });
 
         <span class='kw'>let</span> <span class='ident'>r</span> <span class='op'>=</span> <span class='ident'>Deferred</span>::<span class='ident'>vec_to_promise</span>(<span class='macro'>vec</span><span class='macro'>!</span>[<span class='ident'>d1</span>, <span class='ident'>d2</span>, <span class='ident'>d3</span>, <span class='ident'>d4</span>], <span class='ident'>ControlFlow</span>::<span class='ident'>ParallelLimit</span>(<span class='number'>2</span>))
-            .<span class='ident'>then</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
+            .<span class='ident'>success</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
                 <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='macro'>vec</span><span class='macro'>!</span>[<span class='number'>1u32</span>,<span class='number'>2u32</span>, <span class='number'>3u32</span>,<span class='number'>4u32</span>], <span class='ident'>res</span>);
                 <span class='prelude-val'>Ok</span>(<span class='number'>0u32</span>)
             }).<span class='ident'>sync</span>();        
@@ -1529,13 +1591,13 @@ promise.then(|res| {
             <span class='ident'>Promise</span>::<span class='ident'>new</span>(<span class='op'>||</span> {
                 <span class='ident'>Promise</span>::<span class='ident'>new</span>(<span class='op'>||</span> {
                     <span class='prelude-val'>Ok</span>(<span class='number'>4</span>)
-                }).<span class='ident'>then</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
+                }).<span class='ident'>success</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
                     <span class='prelude-val'>Ok</span>(<span class='ident'>res</span> <span class='op'>+</span> <span class='number'>2</span>)
                 }).<span class='ident'>sync</span>()
-            }).<span class='ident'>then</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
+            }).<span class='ident'>success</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
                 <span class='prelude-val'>Ok</span>(<span class='ident'>res</span> <span class='op'>*</span> <span class='number'>7</span>)
             }).<span class='ident'>sync</span>()
-        }).<span class='ident'>then</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
+        }).<span class='ident'>success</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
             <span class='prelude-val'>Ok</span>(<span class='ident'>res</span> <span class='op'>+</span> <span class='number'>5</span>)
         }).<span class='ident'>sync</span>().<span class='ident'>unwrap</span>();
         <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='number'>47</span>);
