@@ -487,8 +487,159 @@ impl<T,E> Promise<T,E> where T: Send + 'static , E: Send + 'static {
             Err(e) => fe(e)
         };
     }   
+}
+
+pub struct EventLoop<Ev> {
+    tx       : mpsc::Sender<Option<Ev>>,
+    entries  : Arc<Mutex<Vec<Ev>>>,
+    finisher : Arc<(Mutex<bool>, Condvar)>,
+    finished : Arc<Mutex<bool>>,
+}
+
+impl<Ev> Clone for EventLoop<Ev> {
+    fn clone(&self) -> EventLoop<Ev> {
+        EventLoop {
+            tx       : self.tx.clone(),
+            entries  : self.entries.clone(),
+            finisher : self.finisher.clone(),
+            finished : self.finished.clone(),
+        }
+    } 
+}
+
+impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
+
+    pub fn new() -> EventLoop<Ev> {
+        let pair = Arc::new((Mutex::new(false), Condvar::new()));        
+        let pair_cloned = pair.clone();
+        let (tx,rx) = mpsc::channel();
+        let entries = Arc::new(Mutex::new(Vec::new()));
+        let entries_cloned = entries.clone(); 
+        thread::spawn(move || {
+            loop {
+                match rx.recv() { 
+                    Ok(t) =>  match t {
+                        Some(v) => {
+                            let mut lock = entries_cloned.lock().unwrap();
+                            lock.push(v);
+                        }, 
+                        None => break 
+                    },                    
+                    Err(_) => break
+                };
+            }
+            let &(ref lock, ref cvar) = &*pair_cloned;        
+            let mut finished = lock.lock().unwrap();
+            *finished = true;
+            cvar.notify_one();            
+        });
+        EventLoop {
+            tx       : tx,
+            entries  : entries,
+            finisher : pair,
+            finished : Arc::new(Mutex::new(false)),
+        }
+    }
 
 
+    pub fn on<F>(f:F) -> EventLoop<Ev> where F : Send + 'static + Fn(Ev) -> Option<Ev> {      
+        let pair = Arc::new((Mutex::new(false), Condvar::new()));    
+        let pair_cloned = pair.clone();
+        let (tx,rx) = mpsc::channel();
+        let entries = Arc::new(Mutex::new(Vec::new()));
+        let entries_cloned = entries.clone(); 
+        thread::spawn(move || {
+            loop {
+                let rec = match rx.recv() { 
+                    Ok(t) => match t {
+                        Some(v) => v , 
+                        None => break
+                    },
+                    Err(_) => break
+                };
+                match f(rec) {
+                    Some(e) => {
+                        let mut lock = entries_cloned.lock().unwrap();
+                        lock.push(e);
+                    },
+                    None => ()
+                }
+            }
+            let &(ref lock, ref cvar) = &*pair_cloned;        
+            let mut finished = lock.lock().unwrap();
+            *finished = true;
+            cvar.notify_one();             
+        });
+        EventLoop {
+            tx       : tx,
+            entries  : entries,
+            finisher : pair,
+            finished : Arc::new(Mutex::new(false)),
+        }
+    }
+
+    pub fn emit(&self, event:Ev) -> Result<(), Ev>{         
+        if self.is_active() {
+            match self.tx.send(Some(event)) {
+                Ok(_) => Ok(()),
+                Err(e) => Err(e.0.unwrap())            
+            }
+        } else {
+            Err(event)
+        }
+    }
+
+    pub fn emit_until<F>(&self, f:F)  where F : Send + 'static + Fn() -> Option<Ev> {
+        let self_cloned = self.clone();
+        thread::spawn(move || {
+            loop {
+                match f() {
+                    Some(e) => match self_cloned.emit(e) {
+                        Ok(_) => (),
+                        Err(_) => break,
+                    },
+                    None => break,
+                };
+            }
+        });
+    }
+
+    pub fn finish(self) -> EventLoop<Ev> { 
+        {
+            let mut lock_finished = self.finished.lock().unwrap();
+            if !*lock_finished {
+               *lock_finished = true;
+               let _ = self.tx.send(None);
+            }
+        }
+        self
+    }
+
+    pub fn finish_in_ms(self, duration_ms:u32) -> EventLoop<Ev> {
+        {
+            let self_cloned = self.clone();        
+            thread::spawn(move|| {
+                thread::sleep_ms(duration_ms);    
+                let _ = self_cloned.finish();            
+            });
+        }
+        self
+    }        
+
+    pub fn to_promise(self) -> Promise<Arc<Mutex<Vec<Ev>>>,()> {
+        let self_cloned = self.clone();
+        Promise::new(move || { 
+            let &(ref lock, ref cvar) = &*self_cloned.finisher;
+            let mut finished = lock.lock().unwrap();    
+            while !*finished {  finished = cvar.wait(finished).unwrap(); }                           
+            Ok(self_cloned.entries)
+        })
+    }     
+
+    pub fn is_active(&self) -> bool {
+        let lock_finished = self.finished.lock().unwrap();
+        !*lock_finished
+    } 
 }
 
 #[cfg(test)]
@@ -778,4 +929,95 @@ mod test {
         }).sync().unwrap();
         assert_eq!(res, 47);
     }
+
+    #[test]
+    fn event_loop_1() {
+        let event_loop = EventLoop::new();
+        assert_eq!(event_loop.emit("EventA"), Ok(()));
+        assert_eq!(event_loop.emit("EventB"), Ok(()));
+        assert_eq!(event_loop.emit("EventC"), Ok(()));
+        let res = event_loop.finish().to_promise().sync().unwrap();
+        let lock = res.lock().unwrap();
+        assert_eq!(*lock, vec!["EventA", "EventB", "EventC"]);
+    }
+
+    #[test]
+    fn event_loop_2() {
+        let event_loop = EventLoop::new().finish_in_ms(20);
+        assert_eq!(event_loop.emit("EventA"), Ok(()));
+        assert_eq!(event_loop.emit("EventB"), Ok(()));
+        thread::sleep_ms(25);
+        assert_eq!(event_loop.emit("EventC"), Err("EventC"));
+        let res = event_loop.finish().to_promise().sync().unwrap();
+        let lock = res.lock().unwrap();
+        assert_eq!(*lock, vec!["EventA", "EventB"]);
+    }    
+
+    #[test]
+    fn event_loop_3() {
+        let event_loop = EventLoop::new();
+        assert_eq!(event_loop.emit("EventA"), Ok(()));
+        assert_eq!(event_loop.emit("EventB"), Ok(()));
+        let event_loop = event_loop.finish();
+        assert_eq!(event_loop.emit("EventC"), Err("EventC"));
+        assert_eq!(event_loop.is_active(), false);
+        let res = event_loop.to_promise().sync().unwrap();
+        let lock = res.lock().unwrap();
+        assert_eq!(*lock, vec!["EventA", "EventB"]);
+    }        
+
+    #[test]
+    fn event_loop_4() {
+        let event_loop = EventLoop::new().finish_in_ms(70);
+        assert_eq!(event_loop.emit("EventA"), Ok(()));        
+        assert_eq!(event_loop.emit("EventB"), Ok(()));
+        let x = Arc::new(Mutex::new(0));
+        event_loop.emit_until(move || {
+            thread::sleep_ms(25);
+            let mut lock_x = x.lock().unwrap(); *lock_x += 1;
+            if *lock_x <= 3 { Some("EventC") } else { None }
+        });
+        let res = event_loop.to_promise().sync().unwrap();
+        let lock = res.lock().unwrap();
+        assert_eq!(*lock, vec!["EventA", "EventB", "EventC", "EventC"]);
+    }     
+
+    #[test]
+    fn event_loop_on_1() {
+        let event_loop = EventLoop::on(|event| {
+            match event {
+                "EventA" => Some("EventATreated"),
+                "EventB" => None,
+                _ => Some("EventOtherTreated")
+            }
+        });
+        assert_eq!(event_loop.emit("EventA"), Ok(()));
+        assert_eq!(event_loop.emit("EventB"), Ok(()));
+        assert_eq!(event_loop.emit("EventC"), Ok(()));
+        let res = event_loop.finish().to_promise().sync().unwrap();
+        let lock = res.lock().unwrap();
+        assert_eq!(*lock, vec!["EventATreated", "EventOtherTreated"]);
+    }
+
+    #[test]
+    fn event_loop_on_2() {
+        enum Event {
+            Hello(String),
+            Goodbye(String)
+        }
+        let event_loop = EventLoop::on(|event| {
+            match event {
+                Event::Hello(_) => None,
+                Event::Goodbye(v) => Some(Event::Goodbye(v)),
+            }
+        }).finish_in_ms(100);
+        assert!(event_loop.emit(Event::Hello("World".to_string())).is_ok());
+        assert!(event_loop.emit(Event::Goodbye("BCN".to_string())).is_ok());
+        assert!(event_loop.emit(Event::Goodbye("MAD".to_string())).is_ok());
+        let res = event_loop.to_promise().sync().unwrap();
+        let lock = res.lock().unwrap();
+        assert_eq!(lock.len(), 2);
+        match lock[0] { Event::Goodbye(ref v) => assert_eq!(v, "BCN") , _ => panic!() };
+        match lock[1] { Event::Goodbye(ref v) => assert_eq!(v, "MAD") , _ => panic!() };
+    }    
 }
