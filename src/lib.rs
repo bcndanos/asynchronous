@@ -533,7 +533,7 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
     /// el.emit("Event1");
     /// el.emit("Event2");
     /// // Do something here
-    /// el.to_promise().finally_sync(|res| {  // res: Arc<Mutex<T>>
+    /// el.to_promise().finally_sync(|res| {  // res: Arc<Mutex<Vec<Ev>>>
     ///     assert_eq!(*res.lock().unwrap(), vec!["Event1", "Event2"]);
     /// }, |error| {
     ///     // Check Errors
@@ -586,7 +586,7 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
     /// el.emit(MiEvents::Hello("World".to_string()));
     /// el.emit(MiEvents::Goodbye(3));
     /// // Do something here
-    /// el.finish().to_promise().finally_sync(|res| {  // res: Arc<Mutex<T>>
+    /// el.finish().to_promise().finally_sync(|res| {  // res: Arc<Mutex<Vec<Ev>>>
     ///     assert_eq!(res.lock().unwrap().len(), 0);
     /// }, |error| {
     ///     // Check Errors
@@ -635,7 +635,7 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
     /// el.emit(MiEvents::Hello("World".to_string()));
     /// el.emit(MiEvents::Goodbye(555));
     /// // Do something here
-    /// el.finish().to_promise().finally_sync(|res| {  // res: Arc<Mutex<T>>
+    /// el.finish().to_promise().finally_sync(|res| {  // res: Arc<Mutex<Vec<Ev>>>
     ///     let lock = res.lock().unwrap();
     ///     assert_eq!(lock.len(), 1);
     ///     match lock[0] { MiEvents::Goodbye(v) => assert_eq!(v, 555), _=> () };
