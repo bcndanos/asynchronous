@@ -54,7 +54,6 @@ fn function_test() {
     });
     for _ in 0..3 { &tx.send("TestC"); }
     
-
     println!("Result 2: {:?}", event_loop_a.emit(Event::Goodbye(2)));
     let _ = promise.sync();
     println!("Result 3: {:?}", event_loop_a.emit(Event::Goodbye(3)));    

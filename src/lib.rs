@@ -1,13 +1,16 @@
 /*!
 A **promise** based asynchronous library
 
-This library will provide an usefull way to invoke functions (clousures) in a **Promise Style**. A Promise 
-is a Struct that represents the return value or the error that the funcion produces and it's executed in
-a separated thread. 
+This library provides an usefull way to invoke functions (clousures) in a **Promise Style** using separated threads. A Promise 
+is a Struct that represents the return value or the error that the funcion produces. 
+
+It also allows the execution of tasks in Parallel or Series in deferred, joining the result in a Promise.
+
+It includes methods to manage Event Loops, where there are tasks that "emit" events in background, and they are collected by a promise.
 
 [Project github page](https://github.com/bcndanos/asynchronous)
 
-This project is based on the [Q Promise](https://github.com/kriskowal/q) library for Node JS .
+This project is based on the [Q Promise](https://github.com/kriskowal/q) library for Node JS and [Async.js](https://github.com/caolan/async)
 
 # Examples
 
@@ -19,13 +22,13 @@ use asynchronous::Promise;
 Promise::new(|| {
   // Do something  
   let ret = 10.0 / 3.0;
-  if ret > 0.0 { Ok(ret) } else { Err("Value Incorrect") }
+  if ret > 0.0 { Ok(ret) } else { Err("Incorrect Value") }
 }).success(|res| {            // res has type f64
   // Do something if the previous result is correct
   assert_eq!(res, 10.0 / 3.0);
   let res_int = res as u32 * 2;
   Ok(res_int)
-}).finally_sync(|res| {    // res has type u32
+}).finally_sync(|res| {       // res has type u32
   // Catch a correct result
   assert_eq!(res, 6u32);
 }, |error| {
@@ -34,17 +37,15 @@ Promise::new(|| {
 });
 ``` 
 
-Using deferred execution of 1 simple tasks, 3 tasks in Parallel and 2 tasks in Series:
+Deferred execution:
 
 ```rust
-use asynchronous::Promise;
-use asynchronous::Deferred;
-use asynchronous::ControlFlow;
+use asynchronous::{Promise,Deferred,ControlFlow};
 
 let d_a = Deferred::<&str, &str>::new(|| { Ok("a") });
 let p_b = Promise::<&str, &str>::new(|| { Ok("b") });  // Executed right now
 let d1 = Deferred::<u32, &str>::new(|| { Ok(1u32) });
-let d2 = Deferred::<u32, &str>::new(|| { Err("Error Mock") });
+let d2 = Deferred::<u32, &str>::new(|| { Err("Mock Error") });
 let d3 = Deferred::<u32, &str>::new(|| { Ok(3u32) });
 let d4 = Deferred::<u32, &str>::new(|| { Ok(4u32) });
 let d5 = Deferred::<u32, &str>::new(|| { Ok(5u32) });
@@ -52,31 +53,44 @@ let d5 = Deferred::<u32, &str>::new(|| { Ok(5u32) });
 let promise = Deferred::vec_to_promise(vec![d1,d2,d3], ControlFlow::Parallel);
 // Only d1, d2 and d3 are being executed at this time.
 
-let value_b = d_a.to_promise().success(|res_a| {
-    assert_eq!(res_a, "a");
+assert_eq!("ab", d_a.to_promise().success(|res_a| {
     p_b.success(move |res_b| {
         Ok(res_a.to_string() + res_b)
     }).sync()
-}).sync().unwrap();
-assert_eq!(value_b, "ab");
+}).sync().unwrap());
 
 promise.success(|res| {
     // Catch the result. In this case, tasks d4 and d5 never will be executed
-    unreachable!();
     Ok(res)
 }).fail(|error| {
     // Catch the error and execute another Promise
-    assert_eq!(error, vec![Ok(1u32), Err("Error Mock"), Ok(3u32)]);    
+    assert_eq!(error, vec![Ok(1u32), Err("Mock Error"), Ok(3u32)]);    
     Deferred::vec_to_promise(vec![d4,d5], ControlFlow::Series).sync()
 }).finally_sync(|res| {   // res : Vec<u32>
     // Do something here    
     assert_eq!(res, vec![4u32, 5u32]);
-}, |error| { // error : Vec<Result<u32,&str>>
-    // Do something here.
-    unreachable!();
+}, |error| {              // error : Vec<Result<u32,&str>>
+    // Check Errors
 });
 
 ``` 
+
+Simple event loop:
+
+```rust
+use asynchronous::EventLoop;
+
+let el = EventLoop::new().finish_in_ms(100);
+el.emit("Event1");
+el.emit("Event2");
+// Do something here
+el.to_promise().finally_sync(|res| {  // res: Arc<Mutex<T>>
+    assert_eq!(*res.lock().unwrap(), vec!["Event1", "Event2"]);
+}, |error| {
+    // Check Errors
+});
+``` 
+
 */
 extern crate num_cpus;
 
@@ -489,6 +503,7 @@ impl<T,E> Promise<T,E> where T: Send + 'static , E: Send + 'static {
     }   
 }
 
+///Executes a task in background collecting events from other threads
 pub struct EventLoop<Ev> {
     tx       : mpsc::Sender<Option<Ev>>,
     entries  : Arc<Mutex<Vec<Ev>>>,
@@ -509,6 +524,21 @@ impl<Ev> Clone for EventLoop<Ev> {
 
 impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
 
+    /// Creates a new Event Loop and collects all the events into a vector
+    /// 
+    /// ```rust
+    /// use asynchronous::EventLoop;
+    /// 
+    /// let el = EventLoop::new().finish_in_ms(100);
+    /// el.emit("Event1");
+    /// el.emit("Event2");
+    /// // Do something here
+    /// el.to_promise().finally_sync(|res| {  // res: Arc<Mutex<T>>
+    ///     assert_eq!(*res.lock().unwrap(), vec!["Event1", "Event2"]);
+    /// }, |error| {
+    ///     // Check Errors
+    /// });
+    /// ``` 
     pub fn new() -> EventLoop<Ev> {
         let pair = Arc::new((Mutex::new(false), Condvar::new()));        
         let pair_cloned = pair.clone();
@@ -541,7 +571,27 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
         }
     }
 
-
+    /// Creates a new Event Loop and parses all the events produced
+    /// 
+    /// ```rust
+    /// use asynchronous::EventLoop;
+    /// enum MiEvents { Hello(String), Goodbye(u32)}
+    ///
+    /// let el = EventLoop::on(|event| {
+    ///    match event {
+    ///       MiEvents::Hello(s) => println!("Hello {}", s),
+    ///       MiEvents::Goodbye(v) => println!("Goodbye {}", v),
+    ///    }
+    /// });
+    /// el.emit(MiEvents::Hello("World".to_string()));
+    /// el.emit(MiEvents::Goodbye(3));
+    /// // Do something here
+    /// el.finish().to_promise().finally_sync(|res| {  // res: Arc<Mutex<T>>
+    ///     assert_eq!(res.lock().unwrap().len(), 0);
+    /// }, |error| {
+    ///     // Check Errors
+    /// });
+    /// ```     
     pub fn on<F>(f:F) -> EventLoop<Ev> where F : Send + 'static + Fn(Ev) {      
         let pair = Arc::new((Mutex::new(false), Condvar::new()));    
         let pair_cloned = pair.clone();
@@ -570,6 +620,29 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
         }
     }
 
+    /// Creates a new Event Loop, parses all the events produced and collects what you want into a vector
+    /// 
+    /// ```rust
+    /// use asynchronous::EventLoop;
+    /// enum MiEvents { Hello(String), Goodbye(u32)}
+    /// 
+    /// let el = EventLoop::on_collect(|event| {
+    ///    match event {
+    ///       MiEvents::Hello(s) => { println!("Hello {}", s); None },
+    ///       MiEvents::Goodbye(v) => Some(MiEvents::Goodbye(v)),
+    ///    }
+    /// });
+    /// el.emit(MiEvents::Hello("World".to_string()));
+    /// el.emit(MiEvents::Goodbye(555));
+    /// // Do something here
+    /// el.finish().to_promise().finally_sync(|res| {  // res: Arc<Mutex<T>>
+    ///     let lock = res.lock().unwrap();
+    ///     assert_eq!(lock.len(), 1);
+    ///     match lock[0] { MiEvents::Goodbye(v) => assert_eq!(v, 555), _=> () };
+    /// }, |error| {
+    ///     // Check Errors
+    /// });
+    /// ```         
     pub fn on_collect<F>(f:F) -> EventLoop<Ev> where F : Send + 'static + Fn(Ev) -> Option<Ev> {      
         let pair = Arc::new((Mutex::new(false), Condvar::new()));    
         let pair_cloned = pair.clone();
@@ -606,6 +679,7 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
         }        
     }
 
+    /// Triggers an event "Ev" once. Returns the same event if the event loop is not active.
     pub fn emit(&self, event:Ev) -> Result<(), Ev>{         
         if self.is_active() {
             match self.tx.send(Some(event)) {
@@ -617,6 +691,24 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
         }
     }
 
+    /// Triggers an event "Ev" until the return of the "clousure" is None
+    /// 
+    /// ```rust
+    /// use asynchronous::EventLoop;
+    /// 
+    /// let el = EventLoop::new();
+    /// let x = std::sync::Arc::new(std::sync::Mutex::new(0));
+    /// el.emit_until(move || {
+    ///    let mut lock_x = x.lock().unwrap(); *lock_x += 1;
+    ///    if *lock_x <= 3 { Some("Event Test") } else { None }
+    /// });    
+    /// // Do something here
+    /// el.finish_in_ms(100).to_promise().finally_sync(|res| {  // res: Arc<Mutex<T>>
+    ///     assert_eq!(*res.lock().unwrap(), vec!["Event Test", "Event Test", "Event Test"]);
+    /// }, |error| {
+    ///     // Check Errors
+    /// });
+    /// ```     
     pub fn emit_until<F>(&self, f:F)  where F : Send + 'static + Fn() -> Option<Ev> {
         let self_cloned = self.clone();
         thread::spawn(move || {
@@ -632,6 +724,7 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
         });
     }
 
+    /// Finishes the event loop immediately.
     pub fn finish(self) -> EventLoop<Ev> { 
         {
             let mut lock_finished = self.finished.lock().unwrap();
@@ -643,6 +736,7 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
         self
     }
 
+    /// Finishes the event loop in N milliseconds
     pub fn finish_in_ms(self, duration_ms:u32) -> EventLoop<Ev> {
         {
             let self_cloned = self.clone();        
@@ -654,6 +748,7 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
         self
     }        
 
+    /// Once the event loop is finished, the promise collects the results.
     pub fn to_promise(self) -> Promise<Arc<Mutex<Vec<Ev>>>,()> {
         let self_cloned = self.clone();
         Promise::new(move || { 
@@ -664,6 +759,7 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
         })
     }     
 
+    /// Returns if the event loop is running
     pub fn is_active(&self) -> bool {
         let lock_finished = self.finished.lock().unwrap();
         !*lock_finished
