@@ -1319,7 +1319,7 @@ let el = EventLoop::new().finish_in_ms(100);
 el.emit(&quot;Event1&quot;);
 el.emit(&quot;Event2&quot;);
 // Do something here
-el.to_promise().finally_sync(|res| {  // res: Arc&lt;Mutex&lt;T&gt;&gt;
+el.to_promise().finally_sync(|res| {  // res: Arc&lt;Mutex&lt;Vec&lt;Ev&gt;&gt;&gt;
     assert_eq!(*res.lock().unwrap(), vec![&quot;Event1&quot;, &quot;Event2&quot;]);
 }, |error| {
     // Check Errors

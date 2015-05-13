@@ -125,7 +125,7 @@ is a Struct that represents the return value or the error that the funcion produ
 <span class='ident'>el</span>.<span class='ident'>emit</span>(<span class='string'>&quot;Event1&quot;</span>);
 <span class='ident'>el</span>.<span class='ident'>emit</span>(<span class='string'>&quot;Event2&quot;</span>);
 <span class='comment'>// Do something here</span>
-<span class='ident'>el</span>.<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Arc&lt;Mutex&lt;T&gt;&gt;</span>
+<span class='ident'>el</span>.<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Arc&lt;Mutex&lt;Vec&lt;Ev&gt;&gt;&gt;</span>
     <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='op'>*</span><span class='ident'>res</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>(), <span class='macro'>vec</span><span class='macro'>!</span>[<span class='string'>&quot;Event1&quot;</span>, <span class='string'>&quot;Event2&quot;</span>]);
 }, <span class='op'>|</span><span class='ident'>error</span><span class='op'>|</span> {
     <span class='comment'>// Check Errors</span>
