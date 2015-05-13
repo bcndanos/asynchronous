@@ -1,6 +1,7 @@
 extern crate asynchronous;
 
 use asynchronous::{Promise, EventLoop};
+use std::sync::mpsc;
 
 #[derive(Debug)]
 enum Event {    
@@ -10,7 +11,7 @@ enum Event {
 
 
 fn function_test() {
-    let event_loop_a = EventLoop::on(move |event| {   
+    let event_loop_a = EventLoop::on_collect(move |event| {   
         match event {
             Event::Hello(t) => {
                 println!("Hello {}", t);
@@ -35,19 +36,31 @@ fn function_test() {
     });
 
     &event_loop_a.emit(Event::Hello("World".to_string()));
+
     &event_loop_b.emit("TestA");    
+
     let x = std::sync::Arc::new(std::sync::Mutex::new(0));
     event_loop_b.emit_until(move || {       
         let mut lock_x = x.lock().unwrap(); *lock_x += 1;
         if *lock_x <= 3 { Some("TestB") } else { None }
     });
-    &event_loop_a.emit(Event::Goodbye(2));
+
+    let (tx,rx) = mpsc::channel();    
+    event_loop_b.emit_until(move || {
+        match rx.recv() {
+            Ok(v) => Some(v),
+            Err(_) => None
+        }
+    });
+    for _ in 0..3 { &tx.send("TestC"); }
+    
+
+    println!("Result 2: {:?}", event_loop_a.emit(Event::Goodbye(2)));
     let _ = promise.sync();
-    &event_loop_a.emit(Event::Goodbye(3));    
+    println!("Result 3: {:?}", event_loop_a.emit(Event::Goodbye(3)));    
     println!("Result 4: {:?}", event_loop_a.emit(Event::Goodbye(4)));
     let event_loop_a = event_loop_a.finish();
     println!("Result 5: {:?}", event_loop_a.emit(Event::Goodbye(5)));
-    &event_loop_b.emit("TestC");
     println!("Result 6: {:?}", event_loop_a.emit(Event::Goodbye(6)));
 
     
@@ -68,4 +81,5 @@ fn function_test() {
 
 fn main () {
     function_test();    
+    std::thread::sleep_ms(500);
 }

@@ -542,7 +542,35 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
     }
 
 
-    pub fn on<F>(f:F) -> EventLoop<Ev> where F : Send + 'static + Fn(Ev) -> Option<Ev> {      
+    pub fn on<F>(f:F) -> EventLoop<Ev> where F : Send + 'static + Fn(Ev) {      
+        let pair = Arc::new((Mutex::new(false), Condvar::new()));    
+        let pair_cloned = pair.clone();
+        let (tx,rx) = mpsc::channel();
+        let entries = Arc::new(Mutex::new(Vec::new()));
+        thread::spawn(move || {
+            loop {
+                match rx.recv() { 
+                    Ok(t) => match t {
+                        Some(v) => f(v) , 
+                        None => break
+                    },
+                    Err(_) => break
+                };            
+            }
+            let &(ref lock, ref cvar) = &*pair_cloned;        
+            let mut finished = lock.lock().unwrap();
+            *finished = true;
+            cvar.notify_one();             
+        });
+        EventLoop {
+            tx       : tx,
+            entries  : entries,
+            finisher : pair,
+            finished : Arc::new(Mutex::new(false)),
+        }
+    }
+
+    pub fn on_collect<F>(f:F) -> EventLoop<Ev> where F : Send + 'static + Fn(Ev) -> Option<Ev> {      
         let pair = Arc::new((Mutex::new(false), Condvar::new()));    
         let pair_cloned = pair.clone();
         let (tx,rx) = mpsc::channel();
@@ -575,7 +603,7 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
             entries  : entries,
             finisher : pair,
             finished : Arc::new(Mutex::new(false)),
-        }
+        }        
     }
 
     pub fn emit(&self, event:Ev) -> Result<(), Ev>{         
@@ -592,7 +620,7 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
     pub fn emit_until<F>(&self, f:F)  where F : Send + 'static + Fn() -> Option<Ev> {
         let self_cloned = self.clone();
         thread::spawn(move || {
-            loop {
+            loop {                
                 match f() {
                     Some(e) => match self_cloned.emit(e) {
                         Ok(_) => (),
@@ -984,7 +1012,52 @@ mod test {
 
     #[test]
     fn event_loop_on_1() {
-        let event_loop = EventLoop::on(|event| {
+        let v = Arc::new(Mutex::new(Vec::<&str>::new()));
+        let v_cloned = v.clone();
+        let event_loop = EventLoop::on(move |event| {
+            match event {
+                "EventA" => { let mut v_lock = v_cloned.lock().unwrap(); v_lock.push("EventATreated"); },
+                "EventB" => (),
+                _ => { let mut v_lock = v_cloned.lock().unwrap(); v_lock.push("EventOtherTreated"); },
+            }
+        });
+        assert_eq!(event_loop.emit("EventA"), Ok(()));
+        assert_eq!(event_loop.emit("EventB"), Ok(()));
+        assert_eq!(event_loop.emit("EventC"), Ok(()));
+        let res = event_loop.finish().to_promise().sync().unwrap();
+        let lock = res.lock().unwrap();
+        assert_eq!(lock.len(), 0);
+        let v_lock = v.lock().unwrap();        
+        assert_eq!(*v_lock, vec!["EventATreated", "EventOtherTreated"]);
+    }
+
+    #[test]
+    fn event_loop_on_2() {
+        enum Event {
+            Hello(String),
+            Goodbye(String)
+        }
+        let v = Arc::new(Mutex::new(Vec::<String>::new()));
+        let v_cloned = v.clone();
+        let event_loop = EventLoop::on(move |event| {
+            match event {
+                Event::Hello(_) => (),
+                Event::Goodbye(v) => { let mut v_lock = v_cloned.lock().unwrap(); v_lock.push(v); },
+            }
+        }).finish_in_ms(100);
+        assert!(event_loop.emit(Event::Hello("World".to_string())).is_ok());
+        assert!(event_loop.emit(Event::Goodbye("BCN".to_string())).is_ok());
+        assert!(event_loop.emit(Event::Goodbye("MAD".to_string())).is_ok());
+        let res = event_loop.to_promise().sync().unwrap();
+        let lock = res.lock().unwrap();
+        assert_eq!(lock.len(), 0);
+        let v_lock = v.lock().unwrap();
+        assert_eq!(*v_lock, vec!["BCN", "MAD"] );
+    }    
+
+    #[test]
+    fn event_loop_on_collect_1() {
+        let event_loop = EventLoop::on_collect(|event| {
             match event {
                 "EventA" => Some("EventATreated"),
                 "EventB" => None,
@@ -1000,12 +1073,12 @@ mod test {
     }
 
     #[test]
-    fn event_loop_on_2() {
+    fn event_loop_on_collect_2() {
         enum Event {
             Hello(String),
             Goodbye(String)
         }
-        let event_loop = EventLoop::on(|event| {
+        let event_loop = EventLoop::on_collect(|event| {
             match event {
                 Event::Hello(_) => None,
                 Event::Goodbye(v) => Some(Event::Goodbye(v)),
@@ -1019,5 +1092,5 @@ mod test {
         assert_eq!(lock.len(), 2);
         match lock[0] { Event::Goodbye(ref v) => assert_eq!(v, "BCN") , _ => panic!() };
         match lock[1] { Event::Goodbye(ref v) => assert_eq!(v, "MAD") , _ => panic!() };
-    }    
+    }        
 }
