@@ -56,7 +56,7 @@
 <span class='ident'>el</span>.<span class='ident'>emit</span>(<span class='string'>&quot;Event1&quot;</span>);
 <span class='ident'>el</span>.<span class='ident'>emit</span>(<span class='string'>&quot;Event2&quot;</span>);
 <span class='comment'>// Do something here</span>
-<span class='ident'>el</span>.<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Arc&lt;Mutex&lt;T&gt;&gt;</span>
+<span class='ident'>el</span>.<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Arc&lt;Mutex&lt;Vec&lt;Ev&gt;&gt;&gt;</span>
     <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='op'>*</span><span class='ident'>res</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>(), <span class='macro'>vec</span><span class='macro'>!</span>[<span class='string'>&quot;Event1&quot;</span>, <span class='string'>&quot;Event2&quot;</span>]);
 }, <span class='op'>|</span><span class='ident'>error</span><span class='op'>|</span> {
     <span class='comment'>// Check Errors</span>
@@ -77,7 +77,7 @@
 <span class='ident'>el</span>.<span class='ident'>emit</span>(<span class='ident'>MiEvents</span>::<span class='ident'>Hello</span>(<span class='string'>&quot;World&quot;</span>.<span class='ident'>to_string</span>()));
 <span class='ident'>el</span>.<span class='ident'>emit</span>(<span class='ident'>MiEvents</span>::<span class='ident'>Goodbye</span>(<span class='number'>3</span>));
 <span class='comment'>// Do something here</span>
-<span class='ident'>el</span>.<span class='ident'>finish</span>().<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Arc&lt;Mutex&lt;T&gt;&gt;</span>
+<span class='ident'>el</span>.<span class='ident'>finish</span>().<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Arc&lt;Mutex&lt;Vec&lt;Ev&gt;&gt;&gt;</span>
     <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>().<span class='ident'>len</span>(), <span class='number'>0</span>);
 }, <span class='op'>|</span><span class='ident'>error</span><span class='op'>|</span> {
     <span class='comment'>// Check Errors</span>
@@ -98,7 +98,7 @@
 <span class='ident'>el</span>.<span class='ident'>emit</span>(<span class='ident'>MiEvents</span>::<span class='ident'>Hello</span>(<span class='string'>&quot;World&quot;</span>.<span class='ident'>to_string</span>()));
 <span class='ident'>el</span>.<span class='ident'>emit</span>(<span class='ident'>MiEvents</span>::<span class='ident'>Goodbye</span>(<span class='number'>555</span>));
 <span class='comment'>// Do something here</span>
-<span class='ident'>el</span>.<span class='ident'>finish</span>().<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Arc&lt;Mutex&lt;T&gt;&gt;</span>
+<span class='ident'>el</span>.<span class='ident'>finish</span>().<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Arc&lt;Mutex&lt;Vec&lt;Ev&gt;&gt;&gt;</span>
     <span class='kw'>let</span> <span class='ident'>lock</span> <span class='op'>=</span> <span class='ident'>res</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>();
     <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>lock</span>.<span class='ident'>len</span>(), <span class='number'>1</span>);
     <span class='kw'>match</span> <span class='ident'>lock</span>[<span class='number'>0</span>] { <span class='ident'>MiEvents</span>::<span class='ident'>Goodbye</span>(<span class='ident'>v</span>) <span class='op'>=&gt;</span> <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>v</span>, <span class='number'>555</span>), _<span class='op'>=&gt;</span> () };
