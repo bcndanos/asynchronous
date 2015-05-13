@@ -43,16 +43,19 @@
     <section id='main' class="content mod">
 <h1 class='fqn'><span class='in-band'>Crate <a class='mod' href=''>asynchronous</a></span><span class='out-of-band'><span id='render-detail'>
             <a id="toggle-all-docs" href="#" title="collapse all docs">[&minus;]</a>
-        </span><a id='src-0' class='srclink' href='../src/asynchronous/lib.rs.html#1-781' title='goto source code'>[src]</a></span></h1>
+        </span><a id='src-0' class='srclink' href='../src/asynchronous/lib.rs.html#1-1192' title='goto source code'>[src]</a></span></h1>
 <div class='docblock'><p>A <strong>promise</strong> based asynchronous library</p>
 
-<p>This library will provide an usefull way to invoke functions (clousures) in a <strong>Promise Style</strong>. A Promise 
-is a Struct that represents the return value or the error that the funcion produces and it&#39;s executed in
-a separated thread. </p>
+<p>This library provides an usefull way to invoke functions (clousures) in a <strong>Promise Style</strong> using separated threads. A Promise 
+is a Struct that represents the return value or the error that the funcion produces. </p>
+
+<p>It also allows the execution of tasks in Parallel or Series in deferred, joining the result in a Promise.</p>
+
+<p>It includes methods to manage Event Loops, where there are tasks that &quot;emit&quot; events in background, and they are collected by a promise.</p>
 
 <p><a href="https://github.com/bcndanos/asynchronous">Project github page</a></p>
 
-<p>This project is based on the <a href="https://github.com/kriskowal/q">Q Promise</a> library for Node JS .</p>
+<p>This project is based on the <a href="https://github.com/kriskowal/q">Q Promise</a> library for Node JS and <a href="https://github.com/caolan/async">Async.js</a></p>
 
 <h1 id="examples" class='section-header'><a
                            href="#examples">Examples</a></h1>
@@ -63,13 +66,13 @@ a separated thread. </p>
 <span class='ident'>Promise</span>::<span class='ident'>new</span>(<span class='op'>||</span> {
   <span class='comment'>// Do something  </span>
   <span class='kw'>let</span> <span class='ident'>ret</span> <span class='op'>=</span> <span class='number'>10.0</span> <span class='op'>/</span> <span class='number'>3.0</span>;
-  <span class='kw'>if</span> <span class='ident'>ret</span> <span class='op'>&gt;</span> <span class='number'>0.0</span> { <span class='prelude-val'>Ok</span>(<span class='ident'>ret</span>) } <span class='kw'>else</span> { <span class='prelude-val'>Err</span>(<span class='string'>&quot;Value Incorrect&quot;</span>) }
+  <span class='kw'>if</span> <span class='ident'>ret</span> <span class='op'>&gt;</span> <span class='number'>0.0</span> { <span class='prelude-val'>Ok</span>(<span class='ident'>ret</span>) } <span class='kw'>else</span> { <span class='prelude-val'>Err</span>(<span class='string'>&quot;Incorrect Value&quot;</span>) }
 }).<span class='ident'>success</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {            <span class='comment'>// res has type f64</span>
   <span class='comment'>// Do something if the previous result is correct</span>
   <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='number'>10.0</span> <span class='op'>/</span> <span class='number'>3.0</span>);
   <span class='kw'>let</span> <span class='ident'>res_int</span> <span class='op'>=</span> <span class='ident'>res</span> <span class='kw'>as</span> <span class='ident'>u32</span> <span class='op'>*</span> <span class='number'>2</span>;
   <span class='prelude-val'>Ok</span>(<span class='ident'>res_int</span>)
-}).<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {    <span class='comment'>// res has type u32</span>
+}).<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {       <span class='comment'>// res has type u32</span>
   <span class='comment'>// Catch a correct result</span>
   <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='number'>6u32</span>);
 }, <span class='op'>|</span><span class='ident'>error</span><span class='op'>|</span> {
@@ -78,16 +81,14 @@ a separated thread. </p>
 });
 </pre>
 
-<p>Using deferred execution of 1 simple tasks, 3 tasks in Parallel and 2 tasks in Series:</p>
+<p>Deferred execution:</p>
 <pre id='rust-example-rendered' class='rust '>
-<span class='kw'>use</span> <span class='ident'>asynchronous</span>::<span class='ident'>Promise</span>;
-<span class='kw'>use</span> <span class='ident'>asynchronous</span>::<span class='ident'>Deferred</span>;
-<span class='kw'>use</span> <span class='ident'>asynchronous</span>::<span class='ident'>ControlFlow</span>;
+<span class='kw'>use</span> <span class='ident'>asynchronous</span>::{<span class='ident'>Promise</span>,<span class='ident'>Deferred</span>,<span class='ident'>ControlFlow</span>};
 
 <span class='kw'>let</span> <span class='ident'>d_a</span> <span class='op'>=</span> <span class='ident'>Deferred</span>::<span class='op'>&lt;</span><span class='kw-2'>&amp;</span><span class='ident'>str</span>, <span class='kw-2'>&amp;</span><span class='ident'>str</span><span class='op'>&gt;</span>::<span class='ident'>new</span>(<span class='op'>||</span> { <span class='prelude-val'>Ok</span>(<span class='string'>&quot;a&quot;</span>) });
 <span class='kw'>let</span> <span class='ident'>p_b</span> <span class='op'>=</span> <span class='ident'>Promise</span>::<span class='op'>&lt;</span><span class='kw-2'>&amp;</span><span class='ident'>str</span>, <span class='kw-2'>&amp;</span><span class='ident'>str</span><span class='op'>&gt;</span>::<span class='ident'>new</span>(<span class='op'>||</span> { <span class='prelude-val'>Ok</span>(<span class='string'>&quot;b&quot;</span>) });  <span class='comment'>// Executed right now</span>
 <span class='kw'>let</span> <span class='ident'>d1</span> <span class='op'>=</span> <span class='ident'>Deferred</span>::<span class='op'>&lt;</span><span class='ident'>u32</span>, <span class='kw-2'>&amp;</span><span class='ident'>str</span><span class='op'>&gt;</span>::<span class='ident'>new</span>(<span class='op'>||</span> { <span class='prelude-val'>Ok</span>(<span class='number'>1u32</span>) });
-<span class='kw'>let</span> <span class='ident'>d2</span> <span class='op'>=</span> <span class='ident'>Deferred</span>::<span class='op'>&lt;</span><span class='ident'>u32</span>, <span class='kw-2'>&amp;</span><span class='ident'>str</span><span class='op'>&gt;</span>::<span class='ident'>new</span>(<span class='op'>||</span> { <span class='prelude-val'>Err</span>(<span class='string'>&quot;Error Mock&quot;</span>) });
+<span class='kw'>let</span> <span class='ident'>d2</span> <span class='op'>=</span> <span class='ident'>Deferred</span>::<span class='op'>&lt;</span><span class='ident'>u32</span>, <span class='kw-2'>&amp;</span><span class='ident'>str</span><span class='op'>&gt;</span>::<span class='ident'>new</span>(<span class='op'>||</span> { <span class='prelude-val'>Err</span>(<span class='string'>&quot;Mock Error&quot;</span>) });
 <span class='kw'>let</span> <span class='ident'>d3</span> <span class='op'>=</span> <span class='ident'>Deferred</span>::<span class='op'>&lt;</span><span class='ident'>u32</span>, <span class='kw-2'>&amp;</span><span class='ident'>str</span><span class='op'>&gt;</span>::<span class='ident'>new</span>(<span class='op'>||</span> { <span class='prelude-val'>Ok</span>(<span class='number'>3u32</span>) });
 <span class='kw'>let</span> <span class='ident'>d4</span> <span class='op'>=</span> <span class='ident'>Deferred</span>::<span class='op'>&lt;</span><span class='ident'>u32</span>, <span class='kw-2'>&amp;</span><span class='ident'>str</span><span class='op'>&gt;</span>::<span class='ident'>new</span>(<span class='op'>||</span> { <span class='prelude-val'>Ok</span>(<span class='number'>4u32</span>) });
 <span class='kw'>let</span> <span class='ident'>d5</span> <span class='op'>=</span> <span class='ident'>Deferred</span>::<span class='op'>&lt;</span><span class='ident'>u32</span>, <span class='kw-2'>&amp;</span><span class='ident'>str</span><span class='op'>&gt;</span>::<span class='ident'>new</span>(<span class='op'>||</span> { <span class='prelude-val'>Ok</span>(<span class='number'>5u32</span>) });
@@ -95,28 +96,39 @@ a separated thread. </p>
 <span class='kw'>let</span> <span class='ident'>promise</span> <span class='op'>=</span> <span class='ident'>Deferred</span>::<span class='ident'>vec_to_promise</span>(<span class='macro'>vec</span><span class='macro'>!</span>[<span class='ident'>d1</span>,<span class='ident'>d2</span>,<span class='ident'>d3</span>], <span class='ident'>ControlFlow</span>::<span class='ident'>Parallel</span>);
 <span class='comment'>// Only d1, d2 and d3 are being executed at this time.</span>
 
-<span class='kw'>let</span> <span class='ident'>value_b</span> <span class='op'>=</span> <span class='ident'>d_a</span>.<span class='ident'>to_promise</span>().<span class='ident'>success</span>(<span class='op'>|</span><span class='ident'>res_a</span><span class='op'>|</span> {
-    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res_a</span>, <span class='string'>&quot;a&quot;</span>);
+<span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='string'>&quot;ab&quot;</span>, <span class='ident'>d_a</span>.<span class='ident'>to_promise</span>().<span class='ident'>success</span>(<span class='op'>|</span><span class='ident'>res_a</span><span class='op'>|</span> {
     <span class='ident'>p_b</span>.<span class='ident'>success</span>(<span class='kw'>move</span> <span class='op'>|</span><span class='ident'>res_b</span><span class='op'>|</span> {
         <span class='prelude-val'>Ok</span>(<span class='ident'>res_a</span>.<span class='ident'>to_string</span>() <span class='op'>+</span> <span class='ident'>res_b</span>)
     }).<span class='ident'>sync</span>()
-}).<span class='ident'>sync</span>().<span class='ident'>unwrap</span>();
-<span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>value_b</span>, <span class='string'>&quot;ab&quot;</span>);
+}).<span class='ident'>sync</span>().<span class='ident'>unwrap</span>());
 
 <span class='ident'>promise</span>.<span class='ident'>success</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
     <span class='comment'>// Catch the result. In this case, tasks d4 and d5 never will be executed</span>
-    <span class='macro'>unreachable</span><span class='macro'>!</span>();
     <span class='prelude-val'>Ok</span>(<span class='ident'>res</span>)
 }).<span class='ident'>fail</span>(<span class='op'>|</span><span class='ident'>error</span><span class='op'>|</span> {
     <span class='comment'>// Catch the error and execute another Promise</span>
-    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>error</span>, <span class='macro'>vec</span><span class='macro'>!</span>[<span class='prelude-val'>Ok</span>(<span class='number'>1u32</span>), <span class='prelude-val'>Err</span>(<span class='string'>&quot;Error Mock&quot;</span>), <span class='prelude-val'>Ok</span>(<span class='number'>3u32</span>)]);    
+    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>error</span>, <span class='macro'>vec</span><span class='macro'>!</span>[<span class='prelude-val'>Ok</span>(<span class='number'>1u32</span>), <span class='prelude-val'>Err</span>(<span class='string'>&quot;Mock Error&quot;</span>), <span class='prelude-val'>Ok</span>(<span class='number'>3u32</span>)]);    
     <span class='ident'>Deferred</span>::<span class='ident'>vec_to_promise</span>(<span class='macro'>vec</span><span class='macro'>!</span>[<span class='ident'>d4</span>,<span class='ident'>d5</span>], <span class='ident'>ControlFlow</span>::<span class='ident'>Series</span>).<span class='ident'>sync</span>()
 }).<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {   <span class='comment'>// res : Vec&lt;u32&gt;</span>
     <span class='comment'>// Do something here    </span>
     <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='macro'>vec</span><span class='macro'>!</span>[<span class='number'>4u32</span>, <span class='number'>5u32</span>]);
-}, <span class='op'>|</span><span class='ident'>error</span><span class='op'>|</span> { <span class='comment'>// error : Vec&lt;Result&lt;u32,&amp;str&gt;&gt;</span>
-    <span class='comment'>// Do something here.</span>
-    <span class='macro'>unreachable</span><span class='macro'>!</span>();
+}, <span class='op'>|</span><span class='ident'>error</span><span class='op'>|</span> {              <span class='comment'>// error : Vec&lt;Result&lt;u32,&amp;str&gt;&gt;</span>
+    <span class='comment'>// Check Errors</span>
+});
+</pre>
+
+<p>Simple event loop:</p>
+<pre id='rust-example-rendered' class='rust '>
+<span class='kw'>use</span> <span class='ident'>asynchronous</span>::<span class='ident'>EventLoop</span>;
+
+<span class='kw'>let</span> <span class='ident'>el</span> <span class='op'>=</span> <span class='ident'>EventLoop</span>::<span class='ident'>new</span>().<span class='ident'>finish_in_ms</span>(<span class='number'>100</span>);
+<span class='ident'>el</span>.<span class='ident'>emit</span>(<span class='string'>&quot;Event1&quot;</span>);
+<span class='ident'>el</span>.<span class='ident'>emit</span>(<span class='string'>&quot;Event2&quot;</span>);
+<span class='comment'>// Do something here</span>
+<span class='ident'>el</span>.<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Arc&lt;Mutex&lt;T&gt;&gt;</span>
+    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='op'>*</span><span class='ident'>res</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>(), <span class='macro'>vec</span><span class='macro'>!</span>[<span class='string'>&quot;Event1&quot;</span>, <span class='string'>&quot;Event2&quot;</span>]);
+}, <span class='op'>|</span><span class='ident'>error</span><span class='op'>|</span> {
+    <span class='comment'>// Check Errors</span>
 });
 </pre>
 </div><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
@@ -128,6 +140,15 @@ a separated thread. </p>
                              <p>Stores a function and delays its execution until it&#39;s transform to a promise.
 T : Type of value returned
 E : Type of error returned</p>
+
+                        </td>
+                    </tr>
+                
+                    <tr class=' module-item'>
+                        <td><a class='struct' href='struct.EventLoop.html'
+                               title='asynchronous::EventLoop'>EventLoop</a></td>
+                        <td class='docblock short'>
+                             <p>Executes a task in background collecting events from other threads</p>
 
                         </td>
                     </tr>
