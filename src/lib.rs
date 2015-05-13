@@ -1067,10 +1067,10 @@ mod test {
 
     #[test]
     fn event_loop_2() {
-        let event_loop = EventLoop::new().finish_in_ms(20);
+        let event_loop = EventLoop::new().finish_in_ms(50);
         assert_eq!(event_loop.emit("EventA"), Ok(()));
         assert_eq!(event_loop.emit("EventB"), Ok(()));
-        thread::sleep_ms(25);
+        thread::sleep_ms(100);
         assert_eq!(event_loop.emit("EventC"), Err("EventC"));
         let res = event_loop.finish().to_promise().sync().unwrap();
         let lock = res.lock().unwrap();
