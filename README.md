@@ -94,8 +94,8 @@ let el = EventLoop::new().finish_in_ms(100);
 el.emit("Event1");
 el.emit("Event2");
 // Do something here
-el.to_promise().finally_sync(|res| {  // res: Arc<Mutex<T>>
-    assert_eq!(*res.lock().unwrap(), vec!["Event1", "Event2"]);
+el.to_promise().finally_sync(|res| {  // res: Vec<Ev>
+    assert_eq!(res, vec!["Event1", "Event2"]);
 }, |error| {
     // Check Errors
 });
