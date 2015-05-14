@@ -43,7 +43,7 @@
     <section id='main' class="content mod">
 <h1 class='fqn'><span class='in-band'>Crate <a class='mod' href=''>asynchronous</a></span><span class='out-of-band'><span id='render-detail'>
             <a id="toggle-all-docs" href="#" title="collapse all docs">[&minus;]</a>
-        </span><a id='src-0' class='srclink' href='../src/asynchronous/lib.rs.html#1-1192' title='goto source code'>[src]</a></span></h1>
+        </span><a id='src-0' class='srclink' href='../src/asynchronous/lib.rs.html#1-1263' title='goto source code'>[src]</a></span></h1>
 <div class='docblock'><p>A <strong>promise</strong> based asynchronous library</p>
 
 <p>This library provides an usefull way to invoke functions (clousures) in a <strong>Promise Style</strong> using separated threads. A Promise 
@@ -125,8 +125,8 @@ is a Struct that represents the return value or the error that the funcion produ
 <span class='ident'>el</span>.<span class='ident'>emit</span>(<span class='string'>&quot;Event1&quot;</span>);
 <span class='ident'>el</span>.<span class='ident'>emit</span>(<span class='string'>&quot;Event2&quot;</span>);
 <span class='comment'>// Do something here</span>
-<span class='ident'>el</span>.<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Arc&lt;Mutex&lt;Vec&lt;Ev&gt;&gt;&gt;</span>
-    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='op'>*</span><span class='ident'>res</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>(), <span class='macro'>vec</span><span class='macro'>!</span>[<span class='string'>&quot;Event1&quot;</span>, <span class='string'>&quot;Event2&quot;</span>]);
+<span class='ident'>el</span>.<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Vec&lt;Ev&gt;</span>
+    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='macro'>vec</span><span class='macro'>!</span>[<span class='string'>&quot;Event1&quot;</span>, <span class='string'>&quot;Event2&quot;</span>]);
 }, <span class='op'>|</span><span class='ident'>error</span><span class='op'>|</span> {
     <span class='comment'>// Check Errors</span>
 });
@@ -154,6 +154,15 @@ E : Type of error returned</p>
                     </tr>
                 
                     <tr class=' module-item'>
+                        <td><a class='struct' href='struct.EventLoopHandler.html'
+                               title='asynchronous::EventLoopHandler'>EventLoopHandler</a></td>
+                        <td class='docblock short'>
+                             <p>Event Loop wrapper that can be cloned to pass through threads</p>
+
+                        </td>
+                    </tr>
+                
+                    <tr class=' module-item'>
                         <td><a class='struct' href='struct.Promise.html'
                                title='asynchronous::Promise'>Promise</a></td>
                         <td class='docblock short'>
@@ -170,6 +179,15 @@ E : Type of error returned</p>
                                title='asynchronous::ControlFlow'>ControlFlow</a></td>
                         <td class='docblock short'>
                              <p>Different possibilities for asynchronous treatment of vectors</p>
+
+                        </td>
+                    </tr>
+                
+                    <tr class=' module-item'>
+                        <td><a class='enum' href='enum.Emit.html'
+                               title='asynchronous::Emit'>Emit</a></td>
+                        <td class='docblock short'>
+                             <p>Enum representing type of Emit in loops</p>
 
                         </td>
                     </tr>

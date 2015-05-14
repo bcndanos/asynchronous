@@ -43,7 +43,7 @@
     <section id='main' class="content struct">
 <h1 class='fqn'><span class='in-band'>Struct <a href='index.html'>asynchronous</a>::<wbr><a class='struct' href=''>EventLoop</a></span><span class='out-of-band'><span id='render-detail'>
             <a id="toggle-all-docs" href="#" title="collapse all docs">[&minus;]</a>
-        </span><a id='src-1375' class='srclink' href='../src/asynchronous/lib.rs.html#507-512' title='goto source code'>[src]</a></span></h1>
+        </span><a id='src-1611' class='srclink' href='../src/asynchronous/lib.rs.html#615-618' title='goto source code'>[src]</a></span></h1>
 <pre class='rust struct'>pub struct EventLoop&lt;Ev&gt; {
     // some fields omitted
 }</pre><div class='docblock'><p>Executes a task in background collecting events from other threads</p>
@@ -56,8 +56,8 @@
 <span class='ident'>el</span>.<span class='ident'>emit</span>(<span class='string'>&quot;Event1&quot;</span>);
 <span class='ident'>el</span>.<span class='ident'>emit</span>(<span class='string'>&quot;Event2&quot;</span>);
 <span class='comment'>// Do something here</span>
-<span class='ident'>el</span>.<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Arc&lt;Mutex&lt;Vec&lt;Ev&gt;&gt;&gt;</span>
-    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='op'>*</span><span class='ident'>res</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>(), <span class='macro'>vec</span><span class='macro'>!</span>[<span class='string'>&quot;Event1&quot;</span>, <span class='string'>&quot;Event2&quot;</span>]);
+<span class='ident'>el</span>.<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Vec&lt;Ev&gt;</span>
+    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='macro'>vec</span><span class='macro'>!</span>[<span class='string'>&quot;Event1&quot;</span>, <span class='string'>&quot;Event2&quot;</span>]);
 }, <span class='op'>|</span><span class='ident'>error</span><span class='op'>|</span> {
     <span class='comment'>// Check Errors</span>
 });
@@ -77,51 +77,50 @@
 <span class='ident'>el</span>.<span class='ident'>emit</span>(<span class='ident'>MiEvents</span>::<span class='ident'>Hello</span>(<span class='string'>&quot;World&quot;</span>.<span class='ident'>to_string</span>()));
 <span class='ident'>el</span>.<span class='ident'>emit</span>(<span class='ident'>MiEvents</span>::<span class='ident'>Goodbye</span>(<span class='number'>3</span>));
 <span class='comment'>// Do something here</span>
-<span class='ident'>el</span>.<span class='ident'>finish</span>().<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Arc&lt;Mutex&lt;Vec&lt;Ev&gt;&gt;&gt;</span>
-    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>().<span class='ident'>len</span>(), <span class='number'>0</span>);
+<span class='ident'>el</span>.<span class='ident'>finish</span>().<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Vec&lt;Ev&gt;</span>
+    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>.<span class='ident'>len</span>(), <span class='number'>0</span>);
 }, <span class='op'>|</span><span class='ident'>error</span><span class='op'>|</span> {
     <span class='comment'>// Check Errors</span>
 });
 </pre>
-</div><h4 id='method.on_collect' class='method'><code>fn <a href='#method.on_collect' class='fnname'>on_collect</a>&lt;F&gt;(f: F) -&gt; <a class='struct' href='../asynchronous/struct.EventLoop.html' title='asynchronous::EventLoop'>EventLoop</a>&lt;Ev&gt; <span class='where'>where F: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static + <a class='trait' href='http://doc.rust-lang.org/nightly/core/ops/trait.Fn.html' title='core::ops::Fn'>Fn</a>(Ev) -&gt; <a class='enum' href='http://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;Ev&gt;</span></code></h4>
+</div><h4 id='method.on_managed' class='method'><code>fn <a href='#method.on_managed' class='fnname'>on_managed</a>&lt;F&gt;(f: F) -&gt; <a class='struct' href='../asynchronous/struct.EventLoop.html' title='asynchronous::EventLoop'>EventLoop</a>&lt;Ev&gt; <span class='where'>where F: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static + <a class='trait' href='http://doc.rust-lang.org/nightly/core/ops/trait.Fn.html' title='core::ops::Fn'>Fn</a>(Ev) -&gt; <a class='enum' href='../asynchronous/enum.Emit.html' title='asynchronous::Emit'>Emit</a>&lt;Ev&gt;</span></code></h4>
 <div class='docblock'><p>Creates a new Event Loop, parses all the events produced and collects what you want into a vector</p>
 <pre id='rust-example-rendered' class='rust '>
-<span class='kw'>use</span> <span class='ident'>asynchronous</span>::<span class='ident'>EventLoop</span>;
+<span class='kw'>use</span> <span class='ident'>asynchronous</span>::{<span class='ident'>EventLoop</span>, <span class='ident'>Emit</span>};
 <span class='kw'>enum</span> <span class='ident'>MiEvents</span> { <span class='ident'>Hello</span>(<span class='ident'>String</span>), <span class='ident'>Goodbye</span>(<span class='ident'>u32</span>)}
  
-<span class='kw'>let</span> <span class='ident'>el</span> <span class='op'>=</span> <span class='ident'>EventLoop</span>::<span class='ident'>on_collect</span>(<span class='op'>|</span><span class='ident'>event</span><span class='op'>|</span> {
+<span class='kw'>let</span> <span class='ident'>el</span> <span class='op'>=</span> <span class='ident'>EventLoop</span>::<span class='ident'>on_managed</span>(<span class='op'>|</span><span class='ident'>event</span><span class='op'>|</span> {
    <span class='kw'>match</span> <span class='ident'>event</span> {
-      <span class='ident'>MiEvents</span>::<span class='ident'>Hello</span>(<span class='ident'>s</span>) <span class='op'>=&gt;</span> { <span class='macro'>println</span><span class='macro'>!</span>(<span class='string'>&quot;Hello {}&quot;</span>, <span class='ident'>s</span>); <span class='prelude-val'>None</span> },
-      <span class='ident'>MiEvents</span>::<span class='ident'>Goodbye</span>(<span class='ident'>v</span>) <span class='op'>=&gt;</span> <span class='prelude-val'>Some</span>(<span class='ident'>MiEvents</span>::<span class='ident'>Goodbye</span>(<span class='ident'>v</span>)),
+      <span class='ident'>MiEvents</span>::<span class='ident'>Hello</span>(<span class='ident'>s</span>) <span class='op'>=&gt;</span> { <span class='macro'>println</span><span class='macro'>!</span>(<span class='string'>&quot;Hello {}&quot;</span>, <span class='ident'>s</span>); <span class='ident'>Emit</span>::<span class='ident'>Continue</span> },
+      <span class='ident'>MiEvents</span>::<span class='ident'>Goodbye</span>(<span class='ident'>v</span>) <span class='op'>=&gt;</span> <span class='ident'>Emit</span>::<span class='ident'>Event</span>(<span class='ident'>MiEvents</span>::<span class='ident'>Goodbye</span>(<span class='ident'>v</span>)),
    }
 });
 <span class='ident'>el</span>.<span class='ident'>emit</span>(<span class='ident'>MiEvents</span>::<span class='ident'>Hello</span>(<span class='string'>&quot;World&quot;</span>.<span class='ident'>to_string</span>()));
 <span class='ident'>el</span>.<span class='ident'>emit</span>(<span class='ident'>MiEvents</span>::<span class='ident'>Goodbye</span>(<span class='number'>555</span>));
 <span class='comment'>// Do something here</span>
-<span class='ident'>el</span>.<span class='ident'>finish</span>().<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Arc&lt;Mutex&lt;Vec&lt;Ev&gt;&gt;&gt;</span>
-    <span class='kw'>let</span> <span class='ident'>lock</span> <span class='op'>=</span> <span class='ident'>res</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>();
-    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>lock</span>.<span class='ident'>len</span>(), <span class='number'>1</span>);
-    <span class='kw'>match</span> <span class='ident'>lock</span>[<span class='number'>0</span>] { <span class='ident'>MiEvents</span>::<span class='ident'>Goodbye</span>(<span class='ident'>v</span>) <span class='op'>=&gt;</span> <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>v</span>, <span class='number'>555</span>), _<span class='op'>=&gt;</span> () };
+<span class='ident'>el</span>.<span class='ident'>finish</span>().<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Vec&lt;Ev&gt;</span>
+    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>.<span class='ident'>len</span>(), <span class='number'>1</span>);
+    <span class='kw'>match</span> <span class='ident'>res</span>[<span class='number'>0</span>] { <span class='ident'>MiEvents</span>::<span class='ident'>Goodbye</span>(<span class='ident'>v</span>) <span class='op'>=&gt;</span> <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>v</span>, <span class='number'>555</span>), _<span class='op'>=&gt;</span> () };
 }, <span class='op'>|</span><span class='ident'>error</span><span class='op'>|</span> {
     <span class='comment'>// Check Errors</span>
 });
 </pre>
 </div><h4 id='method.emit' class='method'><code>fn <a href='#method.emit' class='fnname'>emit</a>(&amp;self, event: Ev) -&gt; <a class='enum' href='http://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>, Ev&gt;</code></h4>
 <div class='docblock'><p>Triggers an event &quot;Ev&quot; once. Returns the same event if the event loop is not active.</p>
-</div><h4 id='method.emit_until' class='method'><code>fn <a href='#method.emit_until' class='fnname'>emit_until</a>&lt;F&gt;(&amp;self, f: F) <span class='where'>where F: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static + <a class='trait' href='http://doc.rust-lang.org/nightly/core/ops/trait.Fn.html' title='core::ops::Fn'>Fn</a>() -&gt; <a class='enum' href='http://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;Ev&gt;</span></code></h4>
+</div><h4 id='method.emit_until' class='method'><code>fn <a href='#method.emit_until' class='fnname'>emit_until</a>&lt;F&gt;(&amp;self, f: F) <span class='where'>where F: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static + <a class='trait' href='http://doc.rust-lang.org/nightly/core/ops/trait.Fn.html' title='core::ops::Fn'>Fn</a>() -&gt; <a class='enum' href='../asynchronous/enum.Emit.html' title='asynchronous::Emit'>Emit</a>&lt;Ev&gt;</span></code></h4>
 <div class='docblock'><p>Triggers an event &quot;Ev&quot; until the return of the &quot;clousure&quot; is None</p>
 <pre id='rust-example-rendered' class='rust '>
-<span class='kw'>use</span> <span class='ident'>asynchronous</span>::<span class='ident'>EventLoop</span>;
+<span class='kw'>use</span> <span class='ident'>asynchronous</span>::{<span class='ident'>EventLoop</span>, <span class='ident'>Emit</span>};
  
 <span class='kw'>let</span> <span class='ident'>el</span> <span class='op'>=</span> <span class='ident'>EventLoop</span>::<span class='ident'>new</span>();
 <span class='kw'>let</span> <span class='ident'>x</span> <span class='op'>=</span> <span class='ident'>std</span>::<span class='ident'>sync</span>::<span class='ident'>Arc</span>::<span class='ident'>new</span>(<span class='ident'>std</span>::<span class='ident'>sync</span>::<span class='ident'>Mutex</span>::<span class='ident'>new</span>(<span class='number'>0</span>));
 <span class='ident'>el</span>.<span class='ident'>emit_until</span>(<span class='kw'>move</span> <span class='op'>||</span> {
    <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>lock_x</span> <span class='op'>=</span> <span class='ident'>x</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>(); <span class='op'>*</span><span class='ident'>lock_x</span> <span class='op'>+=</span> <span class='number'>1</span>;
-   <span class='kw'>if</span> <span class='op'>*</span><span class='ident'>lock_x</span> <span class='op'>&lt;=</span> <span class='number'>3</span> { <span class='prelude-val'>Some</span>(<span class='string'>&quot;Event Test&quot;</span>) } <span class='kw'>else</span> { <span class='prelude-val'>None</span> }
+   <span class='kw'>if</span> <span class='op'>*</span><span class='ident'>lock_x</span> <span class='op'>&lt;=</span> <span class='number'>3</span> { <span class='ident'>Emit</span>::<span class='ident'>Event</span>(<span class='string'>&quot;Event Test&quot;</span>) } <span class='kw'>else</span> { <span class='ident'>Emit</span>::<span class='ident'>Stop</span> }
 });    
 <span class='comment'>// Do something here</span>
-<span class='ident'>el</span>.<span class='ident'>finish_in_ms</span>(<span class='number'>100</span>).<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Arc&lt;Mutex&lt;T&gt;&gt;</span>
-    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='op'>*</span><span class='ident'>res</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>(), <span class='macro'>vec</span><span class='macro'>!</span>[<span class='string'>&quot;Event Test&quot;</span>, <span class='string'>&quot;Event Test&quot;</span>, <span class='string'>&quot;Event Test&quot;</span>]);
+<span class='ident'>el</span>.<span class='ident'>finish_in_ms</span>(<span class='number'>100</span>).<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Vec&lt;Ev&gt;</span>
+    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='macro'>vec</span><span class='macro'>!</span>[<span class='string'>&quot;Event Test&quot;</span>, <span class='string'>&quot;Event Test&quot;</span>, <span class='string'>&quot;Event Test&quot;</span>]);
 }, <span class='op'>|</span><span class='ident'>error</span><span class='op'>|</span> {
     <span class='comment'>// Check Errors</span>
 });
@@ -130,13 +129,13 @@
 <div class='docblock'><p>Finishes the event loop immediately.</p>
 </div><h4 id='method.finish_in_ms' class='method'><code>fn <a href='#method.finish_in_ms' class='fnname'>finish_in_ms</a>(self, duration_ms: <a href='http://doc.rust-lang.org/nightly/std/primitive.u32.html'>u32</a>) -&gt; <a class='struct' href='../asynchronous/struct.EventLoop.html' title='asynchronous::EventLoop'>EventLoop</a>&lt;Ev&gt;</code></h4>
 <div class='docblock'><p>Finishes the event loop in N milliseconds</p>
-</div><h4 id='method.to_promise' class='method'><code>fn <a href='#method.to_promise' class='fnname'>to_promise</a>(self) -&gt; <a class='struct' href='../asynchronous/struct.Promise.html' title='asynchronous::Promise'>Promise</a>&lt;<a class='struct' href='http://doc.rust-lang.org/nightly/alloc/arc/struct.Arc.html' title='alloc::arc::Arc'>Arc</a>&lt;<a class='struct' href='http://doc.rust-lang.org/nightly/std/sync/mutex/struct.Mutex.html' title='std::sync::mutex::Mutex'>Mutex</a>&lt;<a class='struct' href='http://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;Ev&gt;&gt;&gt;, <a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>&gt;</code></h4>
-<div class='docblock'><p>Once the event loop is finished, the promise collects the results.</p>
 </div><h4 id='method.is_active' class='method'><code>fn <a href='#method.is_active' class='fnname'>is_active</a>(&amp;self) -&gt; <a href='http://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a></code></h4>
-<div class='docblock'><p>Returns if the event loop is running</p>
-</div></div><h2 id='implementations'>Trait Implementations</h2><h3 class='impl'><code>impl&lt;Ev&gt; <a class='trait' href='http://doc.rust-lang.org/nightly/core/clone/trait.Clone.html' title='core::clone::Clone'>Clone</a> for <a class='struct' href='../asynchronous/struct.EventLoop.html' title='asynchronous::EventLoop'>EventLoop</a>&lt;Ev&gt;</code></h3><div class='impl-items'><h4 id='method.clone' class='method'><code>fn <a href='http://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone' class='fnname'>clone</a>(&amp;self) -&gt; <a class='struct' href='../asynchronous/struct.EventLoop.html' title='asynchronous::EventLoop'>EventLoop</a>&lt;Ev&gt;</code></h4>
-<h4 id='method.clone_from' class='method'><code>fn <a href='http://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone_from' class='fnname'>clone_from</a>(&amp;mut self, source: &amp;Self)</code></h4>
-</div></section>
+<div class='docblock'><p>Returns true if the event loop is running</p>
+</div><h4 id='method.get_handler' class='method'><code>fn <a href='#method.get_handler' class='fnname'>get_handler</a>(&amp;self) -&gt; <a class='struct' href='../asynchronous/struct.EventLoopHandler.html' title='asynchronous::EventLoopHandler'>EventLoopHandler</a>&lt;Ev&gt;</code></h4>
+<div class='docblock'><p>Returns a handler to Event Emitter</p>
+</div><h4 id='method.to_promise' class='method'><code>fn <a href='#method.to_promise' class='fnname'>to_promise</a>(self) -&gt; <a class='struct' href='../asynchronous/struct.Promise.html' title='asynchronous::Promise'>Promise</a>&lt;<a class='struct' href='http://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;Ev&gt;, <a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>&gt;</code></h4>
+<div class='docblock'><p>Once the event loop is finished, the promise collects the results.</p>
+</div></div></section>
     <section id='search' class="content hidden"></section>
 
     <section class="footer"></section>

@@ -1232,6 +1232,77 @@
 <span id="1190">1190</span>
 <span id="1191">1191</span>
 <span id="1192">1192</span>
+<span id="1193">1193</span>
+<span id="1194">1194</span>
+<span id="1195">1195</span>
+<span id="1196">1196</span>
+<span id="1197">1197</span>
+<span id="1198">1198</span>
+<span id="1199">1199</span>
+<span id="1200">1200</span>
+<span id="1201">1201</span>
+<span id="1202">1202</span>
+<span id="1203">1203</span>
+<span id="1204">1204</span>
+<span id="1205">1205</span>
+<span id="1206">1206</span>
+<span id="1207">1207</span>
+<span id="1208">1208</span>
+<span id="1209">1209</span>
+<span id="1210">1210</span>
+<span id="1211">1211</span>
+<span id="1212">1212</span>
+<span id="1213">1213</span>
+<span id="1214">1214</span>
+<span id="1215">1215</span>
+<span id="1216">1216</span>
+<span id="1217">1217</span>
+<span id="1218">1218</span>
+<span id="1219">1219</span>
+<span id="1220">1220</span>
+<span id="1221">1221</span>
+<span id="1222">1222</span>
+<span id="1223">1223</span>
+<span id="1224">1224</span>
+<span id="1225">1225</span>
+<span id="1226">1226</span>
+<span id="1227">1227</span>
+<span id="1228">1228</span>
+<span id="1229">1229</span>
+<span id="1230">1230</span>
+<span id="1231">1231</span>
+<span id="1232">1232</span>
+<span id="1233">1233</span>
+<span id="1234">1234</span>
+<span id="1235">1235</span>
+<span id="1236">1236</span>
+<span id="1237">1237</span>
+<span id="1238">1238</span>
+<span id="1239">1239</span>
+<span id="1240">1240</span>
+<span id="1241">1241</span>
+<span id="1242">1242</span>
+<span id="1243">1243</span>
+<span id="1244">1244</span>
+<span id="1245">1245</span>
+<span id="1246">1246</span>
+<span id="1247">1247</span>
+<span id="1248">1248</span>
+<span id="1249">1249</span>
+<span id="1250">1250</span>
+<span id="1251">1251</span>
+<span id="1252">1252</span>
+<span id="1253">1253</span>
+<span id="1254">1254</span>
+<span id="1255">1255</span>
+<span id="1256">1256</span>
+<span id="1257">1257</span>
+<span id="1258">1258</span>
+<span id="1259">1259</span>
+<span id="1260">1260</span>
+<span id="1261">1261</span>
+<span id="1262">1262</span>
+<span id="1263">1263</span>
 </pre><pre class='rust '>
 <span class='doccomment'>/*!
 A **promise** based asynchronous library
@@ -1319,8 +1390,8 @@ let el = EventLoop::new().finish_in_ms(100);
 el.emit(&quot;Event1&quot;);
 el.emit(&quot;Event2&quot;);
 // Do something here
-el.to_promise().finally_sync(|res| {  // res: Arc&lt;Mutex&lt;Vec&lt;Ev&gt;&gt;&gt;
-    assert_eq!(*res.lock().unwrap(), vec![&quot;Event1&quot;, &quot;Event2&quot;]);
+el.to_promise().finally_sync(|res| {  // res: Vec&lt;Ev&gt;
+    assert_eq!(res, vec![&quot;Event1&quot;, &quot;Event2&quot;]);
 }, |error| {
     // Check Errors
 });
@@ -1738,23 +1809,118 @@ el.to_promise().finally_sync(|res| {  // res: Arc&lt;Mutex&lt;Vec&lt;Ev&gt;&gt;&
     }   
 }
 
-<span class='doccomment'>///Executes a task in background collecting events from other threads</span>
-<span class='kw'>pub</span> <span class='kw'>struct</span> <span class='ident'>EventLoop</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> {
-    <span class='ident'>tx</span>       : <span class='ident'>mpsc</span>::<span class='ident'>Sender</span><span class='op'>&lt;</span><span class='prelude-ty'>Option</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;&gt;</span>,
-    <span class='ident'>entries</span>  : <span class='ident'>Arc</span><span class='op'>&lt;</span><span class='ident'>Mutex</span><span class='op'>&lt;</span><span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;&gt;</span><span class='op'>&gt;</span>,
+<span class='comment'>// Event Loops //</span>
+
+<span class='doccomment'>/// Enum representing type of Emit in loops</span>
+<span class='kw'>pub</span> <span class='kw'>enum</span> <span class='ident'>Emit</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> {
+    <span class='doccomment'>/// Generates a new event</span>
+    <span class='ident'>Event</span>(<span class='ident'>Ev</span>),   
+    <span class='doccomment'>/// Continues the loop</span>
+    <span class='ident'>Continue</span>,    
+    <span class='doccomment'>/// Stops the loop</span>
+    <span class='ident'>Stop</span>         
+}
+
+<span class='doccomment'>///Event Loop wrapper that can be cloned to pass through threads</span>
+<span class='kw'>pub</span> <span class='kw'>struct</span> <span class='ident'>EventLoopHandler</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> {
+    <span class='ident'>tx</span>       : <span class='ident'>mpsc</span>::<span class='ident'>Sender</span><span class='op'>&lt;</span><span class='prelude-ty'>Option</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;&gt;</span>,    
     <span class='ident'>finisher</span> : <span class='ident'>Arc</span><span class='op'>&lt;</span>(<span class='ident'>Mutex</span><span class='op'>&lt;</span><span class='ident'>bool</span><span class='op'>&gt;</span>, <span class='ident'>Condvar</span>)<span class='op'>&gt;</span>,
     <span class='ident'>finished</span> : <span class='ident'>Arc</span><span class='op'>&lt;</span><span class='ident'>Mutex</span><span class='op'>&lt;</span><span class='ident'>bool</span><span class='op'>&gt;&gt;</span>,
 }
 
-<span class='kw'>impl</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> <span class='ident'>Clone</span> <span class='kw'>for</span> <span class='ident'>EventLoop</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> {
-    <span class='kw'>fn</span> <span class='ident'>clone</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='ident'>EventLoop</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> {
-        <span class='ident'>EventLoop</span> {
+<span class='kw'>impl</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> <span class='ident'>Clone</span> <span class='kw'>for</span> <span class='ident'>EventLoopHandler</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> {
+    <span class='kw'>fn</span> <span class='ident'>clone</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='ident'>EventLoopHandler</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> {
+        <span class='ident'>EventLoopHandler</span> {
             <span class='ident'>tx</span>       : <span class='self'>self</span>.<span class='ident'>tx</span>.<span class='ident'>clone</span>(),
-            <span class='ident'>entries</span>  : <span class='self'>self</span>.<span class='ident'>entries</span>.<span class='ident'>clone</span>(),
             <span class='ident'>finisher</span> : <span class='self'>self</span>.<span class='ident'>finisher</span>.<span class='ident'>clone</span>(),
             <span class='ident'>finished</span> : <span class='self'>self</span>.<span class='ident'>finished</span>.<span class='ident'>clone</span>(),
         }
-    } 
+    }
+}
+
+<span class='kw'>impl</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> <span class='ident'>EventLoopHandler</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span>  <span class='kw'>where</span> <span class='ident'>Ev</span>: <span class='ident'>Send</span> <span class='op'>+</span> <span class='lifetime'>&#39;static</span> {
+    <span class='doccomment'>/// Triggers an event &quot;Ev&quot; once. Returns the same event if the event loop is not active.</span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>emit</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>, <span class='ident'>event</span>:<span class='ident'>Ev</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span>(), <span class='ident'>Ev</span><span class='op'>&gt;</span>{         
+        <span class='kw'>if</span> <span class='self'>self</span>.<span class='ident'>is_active</span>() {
+            <span class='kw'>match</span> <span class='self'>self</span>.<span class='ident'>tx</span>.<span class='ident'>send</span>(<span class='prelude-val'>Some</span>(<span class='ident'>event</span>)) {
+                <span class='prelude-val'>Ok</span>(_) <span class='op'>=&gt;</span> <span class='prelude-val'>Ok</span>(()),
+                <span class='prelude-val'>Err</span>(<span class='ident'>e</span>) <span class='op'>=&gt;</span> <span class='prelude-val'>Err</span>(<span class='ident'>e</span>.<span class='number'>0</span>.<span class='ident'>unwrap</span>())            
+            }
+        } <span class='kw'>else</span> {
+            <span class='prelude-val'>Err</span>(<span class='ident'>event</span>)
+        }
+    }
+
+    <span class='doccomment'>/// Triggers an event &quot;Ev&quot; until the return of the &quot;clousure&quot; is None</span>
+    <span class='doccomment'>/// </span>
+    <span class='doccomment'>/// ```rust</span>
+    <span class='doccomment'>/// use asynchronous::{EventLoop, Emit};</span>
+    <span class='doccomment'>/// </span>
+    <span class='doccomment'>/// let el = EventLoop::new();</span>
+    <span class='doccomment'>/// let x = std::sync::Arc::new(std::sync::Mutex::new(0));</span>
+    <span class='doccomment'>/// el.emit_until(move || {</span>
+    <span class='doccomment'>///    let mut lock_x = x.lock().unwrap(); *lock_x += 1;</span>
+    <span class='doccomment'>///    if *lock_x &lt;= 3 { Emit::Event(&quot;Event Test&quot;) } else { Emit::Stop }</span>
+    <span class='doccomment'>/// });    </span>
+    <span class='doccomment'>/// // Do something here</span>
+    <span class='doccomment'>/// el.finish_in_ms(100).to_promise().finally_sync(|res| {  // res: Vec&lt;Ev&gt;</span>
+    <span class='doccomment'>///     assert_eq!(res, vec![&quot;Event Test&quot;, &quot;Event Test&quot;, &quot;Event Test&quot;]);</span>
+    <span class='doccomment'>/// }, |error| {</span>
+    <span class='doccomment'>///     // Check Errors</span>
+    <span class='doccomment'>/// });</span>
+    <span class='doccomment'>/// ```     </span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>emit_until</span><span class='op'>&lt;</span><span class='ident'>F</span><span class='op'>&gt;</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>, <span class='ident'>f</span>:<span class='ident'>F</span>)  <span class='kw'>where</span> <span class='ident'>F</span> : <span class='ident'>Send</span> <span class='op'>+</span> <span class='lifetime'>&#39;static</span> <span class='op'>+</span> <span class='ident'>Fn</span>() <span class='op'>-&gt;</span> <span class='ident'>Emit</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> {
+        <span class='kw'>let</span> <span class='ident'>handler</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>clone</span>();
+        <span class='ident'>thread</span>::<span class='ident'>spawn</span>(<span class='kw'>move</span> <span class='op'>||</span> {
+            <span class='kw'>loop</span> {                
+                <span class='kw'>match</span> <span class='ident'>f</span>() {
+                    <span class='ident'>Emit</span>::<span class='ident'>Event</span>(<span class='ident'>e</span>) <span class='op'>=&gt;</span> <span class='kw'>match</span> <span class='ident'>handler</span>.<span class='ident'>emit</span>(<span class='ident'>e</span>) {
+                        <span class='prelude-val'>Ok</span>(_) <span class='op'>=&gt;</span> (),
+                        <span class='prelude-val'>Err</span>(_) <span class='op'>=&gt;</span> <span class='kw'>break</span>,
+                    },
+                    <span class='ident'>Emit</span>::<span class='ident'>Continue</span> <span class='op'>=&gt;</span> <span class='kw'>continue</span>,
+                    <span class='ident'>Emit</span>::<span class='ident'>Stop</span> <span class='op'>=&gt;</span> <span class='kw'>break</span>,
+                };
+            }
+        });
+    }    
+
+    <span class='doccomment'>/// Returns true if the event loop is running</span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>is_active</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='ident'>bool</span> {
+        <span class='kw'>let</span> <span class='ident'>lock_finished</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>finished</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>();
+        <span class='op'>!</span><span class='op'>*</span><span class='ident'>lock_finished</span>
+    }     
+
+    <span class='doccomment'>/// Finishes the event loop immediately.</span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>finish</span>(<span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='ident'>EventLoopHandler</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> { 
+        {
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>lock_finished</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>finished</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>();
+            <span class='kw'>if</span> <span class='op'>!</span><span class='op'>*</span><span class='ident'>lock_finished</span> {
+               <span class='op'>*</span><span class='ident'>lock_finished</span> <span class='op'>=</span> <span class='boolval'>true</span>;
+               <span class='kw'>let</span> _ <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>tx</span>.<span class='ident'>send</span>(<span class='prelude-val'>None</span>);
+            }
+        }
+        <span class='self'>self</span>
+    }
+
+    <span class='doccomment'>/// Finishes the event loop in N milliseconds</span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>finish_in_ms</span>(<span class='self'>self</span>, <span class='ident'>duration_ms</span>:<span class='ident'>u32</span>) <span class='op'>-&gt;</span> <span class='ident'>EventLoopHandler</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> {
+        {
+            <span class='kw'>let</span> <span class='ident'>handler</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>clone</span>();
+            <span class='ident'>thread</span>::<span class='ident'>spawn</span>(<span class='kw'>move</span><span class='op'>||</span> {
+                <span class='ident'>thread</span>::<span class='ident'>sleep_ms</span>(<span class='ident'>duration_ms</span>);    
+                <span class='kw'>let</span> _ <span class='op'>=</span> <span class='ident'>handler</span>.<span class='ident'>finish</span>();            
+            });
+        }
+        <span class='self'>self</span>
+    }            
+
+}
+
+<span class='doccomment'>///Executes a task in background collecting events from other threads</span>
+<span class='kw'>pub</span> <span class='kw'>struct</span> <span class='ident'>EventLoop</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> {
+    <span class='ident'>handler</span>  : <span class='ident'>EventLoopHandler</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span>,
+    <span class='ident'>receiver</span> : <span class='ident'>mpsc</span>::<span class='ident'>Receiver</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span>,
 }
 
 <span class='kw'>impl</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> <span class='ident'>EventLoop</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> <span class='kw'>where</span> <span class='ident'>Ev</span>: <span class='ident'>Send</span> <span class='op'>+</span> <span class='lifetime'>&#39;static</span> {
@@ -1768,8 +1934,8 @@ el.to_promise().finally_sync(|res| {  // res: Arc&lt;Mutex&lt;Vec&lt;Ev&gt;&gt;&
     <span class='doccomment'>/// el.emit(&quot;Event1&quot;);</span>
     <span class='doccomment'>/// el.emit(&quot;Event2&quot;);</span>
     <span class='doccomment'>/// // Do something here</span>
-    <span class='doccomment'>/// el.to_promise().finally_sync(|res| {  // res: Arc&lt;Mutex&lt;Vec&lt;Ev&gt;&gt;&gt;</span>
-    <span class='doccomment'>///     assert_eq!(*res.lock().unwrap(), vec![&quot;Event1&quot;, &quot;Event2&quot;]);</span>
+    <span class='doccomment'>/// el.to_promise().finally_sync(|res| {  // res: Vec&lt;Ev&gt;</span>
+    <span class='doccomment'>///     assert_eq!(res, vec![&quot;Event1&quot;, &quot;Event2&quot;]);</span>
     <span class='doccomment'>/// }, |error| {</span>
     <span class='doccomment'>///     // Check Errors</span>
     <span class='doccomment'>/// });</span>
@@ -1778,16 +1944,12 @@ el.to_promise().finally_sync(|res| {  // res: Arc&lt;Mutex&lt;Vec&lt;Ev&gt;&gt;&
         <span class='kw'>let</span> <span class='ident'>pair</span> <span class='op'>=</span> <span class='ident'>Arc</span>::<span class='ident'>new</span>((<span class='ident'>Mutex</span>::<span class='ident'>new</span>(<span class='boolval'>false</span>), <span class='ident'>Condvar</span>::<span class='ident'>new</span>()));        
         <span class='kw'>let</span> <span class='ident'>pair_cloned</span> <span class='op'>=</span> <span class='ident'>pair</span>.<span class='ident'>clone</span>();
         <span class='kw'>let</span> (<span class='ident'>tx</span>,<span class='ident'>rx</span>) <span class='op'>=</span> <span class='ident'>mpsc</span>::<span class='ident'>channel</span>();
-        <span class='kw'>let</span> <span class='ident'>entries</span> <span class='op'>=</span> <span class='ident'>Arc</span>::<span class='ident'>new</span>(<span class='ident'>Mutex</span>::<span class='ident'>new</span>(<span class='ident'>Vec</span>::<span class='ident'>new</span>()));
-        <span class='kw'>let</span> <span class='ident'>entries_cloned</span> <span class='op'>=</span> <span class='ident'>entries</span>.<span class='ident'>clone</span>(); 
+        <span class='kw'>let</span> (<span class='ident'>sender</span>, <span class='ident'>receiver</span>) <span class='op'>=</span> <span class='ident'>mpsc</span>::<span class='ident'>channel</span>();
         <span class='ident'>thread</span>::<span class='ident'>spawn</span>(<span class='kw'>move</span> <span class='op'>||</span> {
             <span class='kw'>loop</span> {
                 <span class='kw'>match</span> <span class='ident'>rx</span>.<span class='ident'>recv</span>() { 
                     <span class='prelude-val'>Ok</span>(<span class='ident'>t</span>) <span class='op'>=&gt;</span>  <span class='kw'>match</span> <span class='ident'>t</span> {
-                        <span class='prelude-val'>Some</span>(<span class='ident'>v</span>) <span class='op'>=&gt;</span> {
-                            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>lock</span> <span class='op'>=</span> <span class='ident'>entries_cloned</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>();
-                            <span class='ident'>lock</span>.<span class='ident'>push</span>(<span class='ident'>v</span>);
-                        }, 
+                        <span class='prelude-val'>Some</span>(<span class='ident'>v</span>) <span class='op'>=&gt;</span> <span class='ident'>sender</span>.<span class='ident'>send</span>(<span class='ident'>v</span>).<span class='ident'>unwrap</span>(),
                         <span class='prelude-val'>None</span> <span class='op'>=&gt;</span> <span class='kw'>break</span> 
                     },                    
                     <span class='prelude-val'>Err</span>(_) <span class='op'>=&gt;</span> <span class='kw'>break</span>
@@ -1799,10 +1961,12 @@ el.to_promise().finally_sync(|res| {  // res: Arc&lt;Mutex&lt;Vec&lt;Ev&gt;&gt;&
             <span class='ident'>cvar</span>.<span class='ident'>notify_one</span>();            
         });
         <span class='ident'>EventLoop</span> {
-            <span class='ident'>tx</span>       : <span class='ident'>tx</span>,
-            <span class='ident'>entries</span>  : <span class='ident'>entries</span>,
-            <span class='ident'>finisher</span> : <span class='ident'>pair</span>,
-            <span class='ident'>finished</span> : <span class='ident'>Arc</span>::<span class='ident'>new</span>(<span class='ident'>Mutex</span>::<span class='ident'>new</span>(<span class='boolval'>false</span>)),
+            <span class='ident'>handler</span>  : <span class='ident'>EventLoopHandler</span> {
+                <span class='ident'>tx</span>       : <span class='ident'>tx</span>,                
+                <span class='ident'>finisher</span> : <span class='ident'>pair</span>,
+                <span class='ident'>finished</span> : <span class='ident'>Arc</span>::<span class='ident'>new</span>(<span class='ident'>Mutex</span>::<span class='ident'>new</span>(<span class='boolval'>false</span>)),                
+            },
+            <span class='ident'>receiver</span> : <span class='ident'>receiver</span>,
         }
     }
 
@@ -1821,8 +1985,8 @@ el.to_promise().finally_sync(|res| {  // res: Arc&lt;Mutex&lt;Vec&lt;Ev&gt;&gt;&
     <span class='doccomment'>/// el.emit(MiEvents::Hello(&quot;World&quot;.to_string()));</span>
     <span class='doccomment'>/// el.emit(MiEvents::Goodbye(3));</span>
     <span class='doccomment'>/// // Do something here</span>
-    <span class='doccomment'>/// el.finish().to_promise().finally_sync(|res| {  // res: Arc&lt;Mutex&lt;Vec&lt;Ev&gt;&gt;&gt;</span>
-    <span class='doccomment'>///     assert_eq!(res.lock().unwrap().len(), 0);</span>
+    <span class='doccomment'>/// el.finish().to_promise().finally_sync(|res| {  // res: Vec&lt;Ev&gt;</span>
+    <span class='doccomment'>///     assert_eq!(res.len(), 0);</span>
     <span class='doccomment'>/// }, |error| {</span>
     <span class='doccomment'>///     // Check Errors</span>
     <span class='doccomment'>/// });</span>
@@ -1831,7 +1995,7 @@ el.to_promise().finally_sync(|res| {  // res: Arc&lt;Mutex&lt;Vec&lt;Ev&gt;&gt;&
         <span class='kw'>let</span> <span class='ident'>pair</span> <span class='op'>=</span> <span class='ident'>Arc</span>::<span class='ident'>new</span>((<span class='ident'>Mutex</span>::<span class='ident'>new</span>(<span class='boolval'>false</span>), <span class='ident'>Condvar</span>::<span class='ident'>new</span>()));    
         <span class='kw'>let</span> <span class='ident'>pair_cloned</span> <span class='op'>=</span> <span class='ident'>pair</span>.<span class='ident'>clone</span>();
         <span class='kw'>let</span> (<span class='ident'>tx</span>,<span class='ident'>rx</span>) <span class='op'>=</span> <span class='ident'>mpsc</span>::<span class='ident'>channel</span>();
-        <span class='kw'>let</span> <span class='ident'>entries</span> <span class='op'>=</span> <span class='ident'>Arc</span>::<span class='ident'>new</span>(<span class='ident'>Mutex</span>::<span class='ident'>new</span>(<span class='ident'>Vec</span>::<span class='ident'>new</span>()));
+        <span class='kw'>let</span> (_, <span class='ident'>receiver</span>) <span class='op'>=</span> <span class='ident'>mpsc</span>::<span class='ident'>channel</span>();
         <span class='ident'>thread</span>::<span class='ident'>spawn</span>(<span class='kw'>move</span> <span class='op'>||</span> {
             <span class='kw'>loop</span> {
                 <span class='kw'>match</span> <span class='ident'>rx</span>.<span class='ident'>recv</span>() { 
@@ -1848,42 +2012,42 @@ el.to_promise().finally_sync(|res| {  // res: Arc&lt;Mutex&lt;Vec&lt;Ev&gt;&gt;&
             <span class='ident'>cvar</span>.<span class='ident'>notify_one</span>();             
         });
         <span class='ident'>EventLoop</span> {
-            <span class='ident'>tx</span>       : <span class='ident'>tx</span>,
-            <span class='ident'>entries</span>  : <span class='ident'>entries</span>,
-            <span class='ident'>finisher</span> : <span class='ident'>pair</span>,
-            <span class='ident'>finished</span> : <span class='ident'>Arc</span>::<span class='ident'>new</span>(<span class='ident'>Mutex</span>::<span class='ident'>new</span>(<span class='boolval'>false</span>)),
+            <span class='ident'>handler</span>  : <span class='ident'>EventLoopHandler</span> {
+                <span class='ident'>tx</span>       : <span class='ident'>tx</span>,                
+                <span class='ident'>finisher</span> : <span class='ident'>pair</span>,
+                <span class='ident'>finished</span> : <span class='ident'>Arc</span>::<span class='ident'>new</span>(<span class='ident'>Mutex</span>::<span class='ident'>new</span>(<span class='boolval'>false</span>)),                
+            },
+            <span class='ident'>receiver</span> : <span class='ident'>receiver</span>,
         }
     }
 
     <span class='doccomment'>/// Creates a new Event Loop, parses all the events produced and collects what you want into a vector</span>
     <span class='doccomment'>/// </span>
     <span class='doccomment'>/// ```rust</span>
-    <span class='doccomment'>/// use asynchronous::EventLoop;</span>
+    <span class='doccomment'>/// use asynchronous::{EventLoop, Emit};</span>
     <span class='doccomment'>/// enum MiEvents { Hello(String), Goodbye(u32)}</span>
     <span class='doccomment'>/// </span>
-    <span class='doccomment'>/// let el = EventLoop::on_collect(|event| {</span>
+    <span class='doccomment'>/// let el = EventLoop::on_managed(|event| {</span>
     <span class='doccomment'>///    match event {</span>
-    <span class='doccomment'>///       MiEvents::Hello(s) =&gt; { println!(&quot;Hello {}&quot;, s); None },</span>
-    <span class='doccomment'>///       MiEvents::Goodbye(v) =&gt; Some(MiEvents::Goodbye(v)),</span>
+    <span class='doccomment'>///       MiEvents::Hello(s) =&gt; { println!(&quot;Hello {}&quot;, s); Emit::Continue },</span>
+    <span class='doccomment'>///       MiEvents::Goodbye(v) =&gt; Emit::Event(MiEvents::Goodbye(v)),</span>
     <span class='doccomment'>///    }</span>
     <span class='doccomment'>/// });</span>
     <span class='doccomment'>/// el.emit(MiEvents::Hello(&quot;World&quot;.to_string()));</span>
     <span class='doccomment'>/// el.emit(MiEvents::Goodbye(555));</span>
     <span class='doccomment'>/// // Do something here</span>
-    <span class='doccomment'>/// el.finish().to_promise().finally_sync(|res| {  // res: Arc&lt;Mutex&lt;Vec&lt;Ev&gt;&gt;&gt;</span>
-    <span class='doccomment'>///     let lock = res.lock().unwrap();</span>
-    <span class='doccomment'>///     assert_eq!(lock.len(), 1);</span>
-    <span class='doccomment'>///     match lock[0] { MiEvents::Goodbye(v) =&gt; assert_eq!(v, 555), _=&gt; () };</span>
+    <span class='doccomment'>/// el.finish().to_promise().finally_sync(|res| {  // res: Vec&lt;Ev&gt;</span>
+    <span class='doccomment'>///     assert_eq!(res.len(), 1);</span>
+    <span class='doccomment'>///     match res[0] { MiEvents::Goodbye(v) =&gt; assert_eq!(v, 555), _=&gt; () };</span>
     <span class='doccomment'>/// }, |error| {</span>
     <span class='doccomment'>///     // Check Errors</span>
     <span class='doccomment'>/// });</span>
     <span class='doccomment'>/// ```         </span>
-    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>on_collect</span><span class='op'>&lt;</span><span class='ident'>F</span><span class='op'>&gt;</span>(<span class='ident'>f</span>:<span class='ident'>F</span>) <span class='op'>-&gt;</span> <span class='ident'>EventLoop</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> <span class='kw'>where</span> <span class='ident'>F</span> : <span class='ident'>Send</span> <span class='op'>+</span> <span class='lifetime'>&#39;static</span> <span class='op'>+</span> <span class='ident'>Fn</span>(<span class='ident'>Ev</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Option</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> {      
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>on_managed</span><span class='op'>&lt;</span><span class='ident'>F</span><span class='op'>&gt;</span>(<span class='ident'>f</span>:<span class='ident'>F</span>) <span class='op'>-&gt;</span> <span class='ident'>EventLoop</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> <span class='kw'>where</span> <span class='ident'>F</span> : <span class='ident'>Send</span> <span class='op'>+</span> <span class='lifetime'>&#39;static</span> <span class='op'>+</span> <span class='ident'>Fn</span>(<span class='ident'>Ev</span>) <span class='op'>-&gt;</span> <span class='ident'>Emit</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> {      
         <span class='kw'>let</span> <span class='ident'>pair</span> <span class='op'>=</span> <span class='ident'>Arc</span>::<span class='ident'>new</span>((<span class='ident'>Mutex</span>::<span class='ident'>new</span>(<span class='boolval'>false</span>), <span class='ident'>Condvar</span>::<span class='ident'>new</span>()));    
         <span class='kw'>let</span> <span class='ident'>pair_cloned</span> <span class='op'>=</span> <span class='ident'>pair</span>.<span class='ident'>clone</span>();
         <span class='kw'>let</span> (<span class='ident'>tx</span>,<span class='ident'>rx</span>) <span class='op'>=</span> <span class='ident'>mpsc</span>::<span class='ident'>channel</span>();
-        <span class='kw'>let</span> <span class='ident'>entries</span> <span class='op'>=</span> <span class='ident'>Arc</span>::<span class='ident'>new</span>(<span class='ident'>Mutex</span>::<span class='ident'>new</span>(<span class='ident'>Vec</span>::<span class='ident'>new</span>()));
-        <span class='kw'>let</span> <span class='ident'>entries_cloned</span> <span class='op'>=</span> <span class='ident'>entries</span>.<span class='ident'>clone</span>(); 
+        <span class='kw'>let</span> (<span class='ident'>sender</span>, <span class='ident'>receiver</span>) <span class='op'>=</span> <span class='ident'>mpsc</span>::<span class='ident'>channel</span>();
         <span class='ident'>thread</span>::<span class='ident'>spawn</span>(<span class='kw'>move</span> <span class='op'>||</span> {
             <span class='kw'>loop</span> {
                 <span class='kw'>let</span> <span class='ident'>rec</span> <span class='op'>=</span> <span class='kw'>match</span> <span class='ident'>rx</span>.<span class='ident'>recv</span>() { 
@@ -1894,11 +2058,9 @@ el.to_promise().finally_sync(|res| {  // res: Arc&lt;Mutex&lt;Vec&lt;Ev&gt;&gt;&
                     <span class='prelude-val'>Err</span>(_) <span class='op'>=&gt;</span> <span class='kw'>break</span>
                 };
                 <span class='kw'>match</span> <span class='ident'>f</span>(<span class='ident'>rec</span>) {
-                    <span class='prelude-val'>Some</span>(<span class='ident'>e</span>) <span class='op'>=&gt;</span> {
-                        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>lock</span> <span class='op'>=</span> <span class='ident'>entries_cloned</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>();
-                        <span class='ident'>lock</span>.<span class='ident'>push</span>(<span class='ident'>e</span>);
-                    },
-                    <span class='prelude-val'>None</span> <span class='op'>=&gt;</span> ()
+                    <span class='ident'>Emit</span>::<span class='ident'>Event</span>(<span class='ident'>e</span>) <span class='op'>=&gt;</span> <span class='ident'>sender</span>.<span class='ident'>send</span>(<span class='ident'>e</span>).<span class='ident'>unwrap</span>(),
+                    <span class='ident'>Emit</span>::<span class='ident'>Continue</span> <span class='op'>=&gt;</span> (),
+                    <span class='ident'>Emit</span>::<span class='ident'>Stop</span> <span class='op'>=&gt;</span> <span class='kw'>break</span>,
                 }
             }
             <span class='kw'>let</span> <span class='kw-2'>&amp;</span>(<span class='kw-2'>ref</span> <span class='ident'>lock</span>, <span class='kw-2'>ref</span> <span class='ident'>cvar</span>) <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='op'>*</span><span class='ident'>pair_cloned</span>;        
@@ -1907,98 +2069,85 @@ el.to_promise().finally_sync(|res| {  // res: Arc&lt;Mutex&lt;Vec&lt;Ev&gt;&gt;&
             <span class='ident'>cvar</span>.<span class='ident'>notify_one</span>();             
         });
         <span class='ident'>EventLoop</span> {
-            <span class='ident'>tx</span>       : <span class='ident'>tx</span>,
-            <span class='ident'>entries</span>  : <span class='ident'>entries</span>,
-            <span class='ident'>finisher</span> : <span class='ident'>pair</span>,
-            <span class='ident'>finished</span> : <span class='ident'>Arc</span>::<span class='ident'>new</span>(<span class='ident'>Mutex</span>::<span class='ident'>new</span>(<span class='boolval'>false</span>)),
+            <span class='ident'>handler</span>  : <span class='ident'>EventLoopHandler</span> {
+                <span class='ident'>tx</span>       : <span class='ident'>tx</span>,                
+                <span class='ident'>finisher</span> : <span class='ident'>pair</span>,
+                <span class='ident'>finished</span> : <span class='ident'>Arc</span>::<span class='ident'>new</span>(<span class='ident'>Mutex</span>::<span class='ident'>new</span>(<span class='boolval'>false</span>)),
+            },
+            <span class='ident'>receiver</span> : <span class='ident'>receiver</span>,
         }        
     }
 
     <span class='doccomment'>/// Triggers an event &quot;Ev&quot; once. Returns the same event if the event loop is not active.</span>
     <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>emit</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>, <span class='ident'>event</span>:<span class='ident'>Ev</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span>(), <span class='ident'>Ev</span><span class='op'>&gt;</span>{         
-        <span class='kw'>if</span> <span class='self'>self</span>.<span class='ident'>is_active</span>() {
-            <span class='kw'>match</span> <span class='self'>self</span>.<span class='ident'>tx</span>.<span class='ident'>send</span>(<span class='prelude-val'>Some</span>(<span class='ident'>event</span>)) {
-                <span class='prelude-val'>Ok</span>(_) <span class='op'>=&gt;</span> <span class='prelude-val'>Ok</span>(()),
-                <span class='prelude-val'>Err</span>(<span class='ident'>e</span>) <span class='op'>=&gt;</span> <span class='prelude-val'>Err</span>(<span class='ident'>e</span>.<span class='number'>0</span>.<span class='ident'>unwrap</span>())            
-            }
-        } <span class='kw'>else</span> {
-            <span class='prelude-val'>Err</span>(<span class='ident'>event</span>)
-        }
+        <span class='self'>self</span>.<span class='ident'>handler</span>.<span class='ident'>emit</span>(<span class='ident'>event</span>)
     }
 
     <span class='doccomment'>/// Triggers an event &quot;Ev&quot; until the return of the &quot;clousure&quot; is None</span>
     <span class='doccomment'>/// </span>
     <span class='doccomment'>/// ```rust</span>
-    <span class='doccomment'>/// use asynchronous::EventLoop;</span>
+    <span class='doccomment'>/// use asynchronous::{EventLoop, Emit};</span>
     <span class='doccomment'>/// </span>
     <span class='doccomment'>/// let el = EventLoop::new();</span>
     <span class='doccomment'>/// let x = std::sync::Arc::new(std::sync::Mutex::new(0));</span>
     <span class='doccomment'>/// el.emit_until(move || {</span>
     <span class='doccomment'>///    let mut lock_x = x.lock().unwrap(); *lock_x += 1;</span>
-    <span class='doccomment'>///    if *lock_x &lt;= 3 { Some(&quot;Event Test&quot;) } else { None }</span>
+    <span class='doccomment'>///    if *lock_x &lt;= 3 { Emit::Event(&quot;Event Test&quot;) } else { Emit::Stop }</span>
     <span class='doccomment'>/// });    </span>
     <span class='doccomment'>/// // Do something here</span>
-    <span class='doccomment'>/// el.finish_in_ms(100).to_promise().finally_sync(|res| {  // res: Arc&lt;Mutex&lt;T&gt;&gt;</span>
-    <span class='doccomment'>///     assert_eq!(*res.lock().unwrap(), vec![&quot;Event Test&quot;, &quot;Event Test&quot;, &quot;Event Test&quot;]);</span>
+    <span class='doccomment'>/// el.finish_in_ms(100).to_promise().finally_sync(|res| {  // res: Vec&lt;Ev&gt;</span>
+    <span class='doccomment'>///     assert_eq!(res, vec![&quot;Event Test&quot;, &quot;Event Test&quot;, &quot;Event Test&quot;]);</span>
     <span class='doccomment'>/// }, |error| {</span>
     <span class='doccomment'>///     // Check Errors</span>
     <span class='doccomment'>/// });</span>
     <span class='doccomment'>/// ```     </span>
-    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>emit_until</span><span class='op'>&lt;</span><span class='ident'>F</span><span class='op'>&gt;</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>, <span class='ident'>f</span>:<span class='ident'>F</span>)  <span class='kw'>where</span> <span class='ident'>F</span> : <span class='ident'>Send</span> <span class='op'>+</span> <span class='lifetime'>&#39;static</span> <span class='op'>+</span> <span class='ident'>Fn</span>() <span class='op'>-&gt;</span> <span class='prelude-ty'>Option</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> {
-        <span class='kw'>let</span> <span class='ident'>self_cloned</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>clone</span>();
-        <span class='ident'>thread</span>::<span class='ident'>spawn</span>(<span class='kw'>move</span> <span class='op'>||</span> {
-            <span class='kw'>loop</span> {                
-                <span class='kw'>match</span> <span class='ident'>f</span>() {
-                    <span class='prelude-val'>Some</span>(<span class='ident'>e</span>) <span class='op'>=&gt;</span> <span class='kw'>match</span> <span class='ident'>self_cloned</span>.<span class='ident'>emit</span>(<span class='ident'>e</span>) {
-                        <span class='prelude-val'>Ok</span>(_) <span class='op'>=&gt;</span> (),
-                        <span class='prelude-val'>Err</span>(_) <span class='op'>=&gt;</span> <span class='kw'>break</span>,
-                    },
-                    <span class='prelude-val'>None</span> <span class='op'>=&gt;</span> <span class='kw'>break</span>,
-                };
-            }
-        });
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>emit_until</span><span class='op'>&lt;</span><span class='ident'>F</span><span class='op'>&gt;</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>, <span class='ident'>f</span>:<span class='ident'>F</span>)  <span class='kw'>where</span> <span class='ident'>F</span> : <span class='ident'>Send</span> <span class='op'>+</span> <span class='lifetime'>&#39;static</span> <span class='op'>+</span> <span class='ident'>Fn</span>() <span class='op'>-&gt;</span> <span class='ident'>Emit</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> {
+        <span class='self'>self</span>.<span class='ident'>handler</span>.<span class='ident'>emit_until</span>(<span class='ident'>f</span>);
     }
 
     <span class='doccomment'>/// Finishes the event loop immediately.</span>
     <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>finish</span>(<span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='ident'>EventLoop</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> { 
-        {
-            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>lock_finished</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>finished</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>();
-            <span class='kw'>if</span> <span class='op'>!</span><span class='op'>*</span><span class='ident'>lock_finished</span> {
-               <span class='op'>*</span><span class='ident'>lock_finished</span> <span class='op'>=</span> <span class='boolval'>true</span>;
-               <span class='kw'>let</span> _ <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>tx</span>.<span class='ident'>send</span>(<span class='prelude-val'>None</span>);
-            }
+        <span class='ident'>EventLoop</span> {
+            <span class='ident'>receiver</span> : <span class='self'>self</span>.<span class='ident'>receiver</span>,
+            <span class='ident'>handler</span>  : <span class='self'>self</span>.<span class='ident'>handler</span>.<span class='ident'>finish</span>(),
         }
-        <span class='self'>self</span>
     }
 
     <span class='doccomment'>/// Finishes the event loop in N milliseconds</span>
     <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>finish_in_ms</span>(<span class='self'>self</span>, <span class='ident'>duration_ms</span>:<span class='ident'>u32</span>) <span class='op'>-&gt;</span> <span class='ident'>EventLoop</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> {
-        {
-            <span class='kw'>let</span> <span class='ident'>self_cloned</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>clone</span>();        
-            <span class='ident'>thread</span>::<span class='ident'>spawn</span>(<span class='kw'>move</span><span class='op'>||</span> {
-                <span class='ident'>thread</span>::<span class='ident'>sleep_ms</span>(<span class='ident'>duration_ms</span>);    
-                <span class='kw'>let</span> _ <span class='op'>=</span> <span class='ident'>self_cloned</span>.<span class='ident'>finish</span>();            
-            });
+        <span class='ident'>EventLoop</span> {
+            <span class='ident'>receiver</span> : <span class='self'>self</span>.<span class='ident'>receiver</span>,
+            <span class='ident'>handler</span>  : <span class='self'>self</span>.<span class='ident'>handler</span>.<span class='ident'>finish_in_ms</span>(<span class='ident'>duration_ms</span>),
         }
-        <span class='self'>self</span>
     }        
 
+    <span class='doccomment'>/// Returns true if the event loop is running</span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>is_active</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='ident'>bool</span> {
+        <span class='self'>self</span>.<span class='ident'>handler</span>.<span class='ident'>is_active</span>()
+    } 
+
+    <span class='doccomment'>/// Returns a handler to Event Emitter</span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>get_handler</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='ident'>EventLoopHandler</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> {
+        <span class='self'>self</span>.<span class='ident'>handler</span>.<span class='ident'>clone</span>()
+    }
+
     <span class='doccomment'>/// Once the event loop is finished, the promise collects the results.</span>
-    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>to_promise</span>(<span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='ident'>Promise</span><span class='op'>&lt;</span><span class='ident'>Arc</span><span class='op'>&lt;</span><span class='ident'>Mutex</span><span class='op'>&lt;</span><span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;&gt;</span><span class='op'>&gt;</span>,()<span class='op'>&gt;</span> {
-        <span class='kw'>let</span> <span class='ident'>self_cloned</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>clone</span>();
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>to_promise</span>(<span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='ident'>Promise</span><span class='op'>&lt;</span><span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span>,()<span class='op'>&gt;</span> {
+        <span class='kw'>let</span> <span class='ident'>handler</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>get_handler</span>();
         <span class='ident'>Promise</span>::<span class='ident'>new</span>(<span class='kw'>move</span> <span class='op'>||</span> { 
-            <span class='kw'>let</span> <span class='kw-2'>&amp;</span>(<span class='kw-2'>ref</span> <span class='ident'>lock</span>, <span class='kw-2'>ref</span> <span class='ident'>cvar</span>) <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='op'>*</span><span class='ident'>self_cloned</span>.<span class='ident'>finisher</span>;
+            <span class='kw'>let</span> <span class='kw-2'>&amp;</span>(<span class='kw-2'>ref</span> <span class='ident'>lock</span>, <span class='kw-2'>ref</span> <span class='ident'>cvar</span>) <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='op'>*</span><span class='ident'>handler</span>.<span class='ident'>finisher</span>;
             <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>finished</span> <span class='op'>=</span> <span class='ident'>lock</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>();    
             <span class='kw'>while</span> <span class='op'>!</span><span class='op'>*</span><span class='ident'>finished</span> {  <span class='ident'>finished</span> <span class='op'>=</span> <span class='ident'>cvar</span>.<span class='ident'>wait</span>(<span class='ident'>finished</span>).<span class='ident'>unwrap</span>(); }                           
-            <span class='prelude-val'>Ok</span>(<span class='ident'>self_cloned</span>.<span class='ident'>entries</span>)
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>vec</span> <span class='op'>=</span> <span class='ident'>Vec</span>::<span class='ident'>new</span>();
+            <span class='kw'>loop</span> {
+                <span class='kw'>match</span> <span class='self'>self</span>.<span class='ident'>receiver</span>.<span class='ident'>recv</span>() {
+                    <span class='prelude-val'>Ok</span>(<span class='ident'>val</span>) <span class='op'>=&gt;</span> <span class='ident'>vec</span>.<span class='ident'>push</span>(<span class='ident'>val</span>),
+                    <span class='prelude-val'>Err</span>(_) <span class='op'>=&gt;</span> <span class='kw'>break</span>,
+                }
+            }
+            <span class='prelude-val'>Ok</span>(<span class='ident'>vec</span>)
         })
-    }     
-
-    <span class='doccomment'>/// Returns if the event loop is running</span>
-    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>is_active</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='ident'>bool</span> {
-        <span class='kw'>let</span> <span class='ident'>lock_finished</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>finished</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>();
-        <span class='op'>!</span><span class='op'>*</span><span class='ident'>lock_finished</span>
-    } 
+    }         
 }
 
 <span class='attribute'>#[<span class='ident'>cfg</span>(<span class='ident'>test</span>)]</span>
@@ -2296,8 +2445,7 @@ el.to_promise().finally_sync(|res| {  // res: Arc&lt;Mutex&lt;Vec&lt;Ev&gt;&gt;&
         <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>event_loop</span>.<span class='ident'>emit</span>(<span class='string'>&quot;EventB&quot;</span>), <span class='prelude-val'>Ok</span>(()));
         <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>event_loop</span>.<span class='ident'>emit</span>(<span class='string'>&quot;EventC&quot;</span>), <span class='prelude-val'>Ok</span>(()));
         <span class='kw'>let</span> <span class='ident'>res</span> <span class='op'>=</span> <span class='ident'>event_loop</span>.<span class='ident'>finish</span>().<span class='ident'>to_promise</span>().<span class='ident'>sync</span>().<span class='ident'>unwrap</span>();
-        <span class='kw'>let</span> <span class='ident'>lock</span> <span class='op'>=</span> <span class='ident'>res</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>();
-        <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='op'>*</span><span class='ident'>lock</span>, <span class='macro'>vec</span><span class='macro'>!</span>[<span class='string'>&quot;EventA&quot;</span>, <span class='string'>&quot;EventB&quot;</span>, <span class='string'>&quot;EventC&quot;</span>]);
+        <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='macro'>vec</span><span class='macro'>!</span>[<span class='string'>&quot;EventA&quot;</span>, <span class='string'>&quot;EventB&quot;</span>, <span class='string'>&quot;EventC&quot;</span>]);
     }
 
     <span class='attribute'>#[<span class='ident'>test</span>]</span>
@@ -2308,8 +2456,7 @@ el.to_promise().finally_sync(|res| {  // res: Arc&lt;Mutex&lt;Vec&lt;Ev&gt;&gt;&
         <span class='ident'>thread</span>::<span class='ident'>sleep_ms</span>(<span class='number'>100</span>);
         <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>event_loop</span>.<span class='ident'>emit</span>(<span class='string'>&quot;EventC&quot;</span>), <span class='prelude-val'>Err</span>(<span class='string'>&quot;EventC&quot;</span>));
         <span class='kw'>let</span> <span class='ident'>res</span> <span class='op'>=</span> <span class='ident'>event_loop</span>.<span class='ident'>finish</span>().<span class='ident'>to_promise</span>().<span class='ident'>sync</span>().<span class='ident'>unwrap</span>();
-        <span class='kw'>let</span> <span class='ident'>lock</span> <span class='op'>=</span> <span class='ident'>res</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>();
-        <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='op'>*</span><span class='ident'>lock</span>, <span class='macro'>vec</span><span class='macro'>!</span>[<span class='string'>&quot;EventA&quot;</span>, <span class='string'>&quot;EventB&quot;</span>]);
+        <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='macro'>vec</span><span class='macro'>!</span>[<span class='string'>&quot;EventA&quot;</span>, <span class='string'>&quot;EventB&quot;</span>]);
     }    
 
     <span class='attribute'>#[<span class='ident'>test</span>]</span>
@@ -2321,24 +2468,23 @@ el.to_promise().finally_sync(|res| {  // res: Arc&lt;Mutex&lt;Vec&lt;Ev&gt;&gt;&
         <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>event_loop</span>.<span class='ident'>emit</span>(<span class='string'>&quot;EventC&quot;</span>), <span class='prelude-val'>Err</span>(<span class='string'>&quot;EventC&quot;</span>));
         <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>event_loop</span>.<span class='ident'>is_active</span>(), <span class='boolval'>false</span>);
         <span class='kw'>let</span> <span class='ident'>res</span> <span class='op'>=</span> <span class='ident'>event_loop</span>.<span class='ident'>to_promise</span>().<span class='ident'>sync</span>().<span class='ident'>unwrap</span>();
-        <span class='kw'>let</span> <span class='ident'>lock</span> <span class='op'>=</span> <span class='ident'>res</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>();
-        <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='op'>*</span><span class='ident'>lock</span>, <span class='macro'>vec</span><span class='macro'>!</span>[<span class='string'>&quot;EventA&quot;</span>, <span class='string'>&quot;EventB&quot;</span>]);
+        <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='macro'>vec</span><span class='macro'>!</span>[<span class='string'>&quot;EventA&quot;</span>, <span class='string'>&quot;EventB&quot;</span>]);
     }        
 
     <span class='attribute'>#[<span class='ident'>test</span>]</span>
     <span class='kw'>fn</span> <span class='ident'>event_loop_4</span>() {
-        <span class='kw'>let</span> <span class='ident'>event_loop</span> <span class='op'>=</span> <span class='ident'>EventLoop</span>::<span class='ident'>new</span>().<span class='ident'>finish_in_ms</span>(<span class='number'>70</span>);
+        <span class='kw'>let</span> <span class='ident'>event_loop</span> <span class='op'>=</span> <span class='ident'>EventLoop</span>::<span class='ident'>new</span>().<span class='ident'>finish_in_ms</span>(<span class='number'>120</span>);
         <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>event_loop</span>.<span class='ident'>emit</span>(<span class='string'>&quot;EventA&quot;</span>), <span class='prelude-val'>Ok</span>(()));        
         <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>event_loop</span>.<span class='ident'>emit</span>(<span class='string'>&quot;EventB&quot;</span>), <span class='prelude-val'>Ok</span>(()));
         <span class='kw'>let</span> <span class='ident'>x</span> <span class='op'>=</span> <span class='ident'>Arc</span>::<span class='ident'>new</span>(<span class='ident'>Mutex</span>::<span class='ident'>new</span>(<span class='number'>0</span>));
         <span class='ident'>event_loop</span>.<span class='ident'>emit_until</span>(<span class='kw'>move</span> <span class='op'>||</span> {
             <span class='ident'>thread</span>::<span class='ident'>sleep_ms</span>(<span class='number'>25</span>);
             <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>lock_x</span> <span class='op'>=</span> <span class='ident'>x</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>(); <span class='op'>*</span><span class='ident'>lock_x</span> <span class='op'>+=</span> <span class='number'>1</span>;
-            <span class='kw'>if</span> <span class='op'>*</span><span class='ident'>lock_x</span> <span class='op'>&lt;=</span> <span class='number'>3</span> { <span class='prelude-val'>Some</span>(<span class='string'>&quot;EventC&quot;</span>) } <span class='kw'>else</span> { <span class='prelude-val'>None</span> }
+            <span class='kw'>if</span> <span class='op'>*</span><span class='ident'>lock_x</span> <span class='op'>==</span> <span class='number'>2</span> { <span class='kw'>return</span> <span class='ident'>Emit</span>::<span class='ident'>Continue</span> }
+            <span class='kw'>if</span> <span class='op'>*</span><span class='ident'>lock_x</span> <span class='op'>&lt;=</span> <span class='number'>5</span> { <span class='ident'>Emit</span>::<span class='ident'>Event</span>(<span class='string'>&quot;EventC&quot;</span>) } <span class='kw'>else</span> { <span class='ident'>Emit</span>::<span class='ident'>Stop</span> }
         });
         <span class='kw'>let</span> <span class='ident'>res</span> <span class='op'>=</span> <span class='ident'>event_loop</span>.<span class='ident'>to_promise</span>().<span class='ident'>sync</span>().<span class='ident'>unwrap</span>();
-        <span class='kw'>let</span> <span class='ident'>lock</span> <span class='op'>=</span> <span class='ident'>res</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>();
-        <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='op'>*</span><span class='ident'>lock</span>, <span class='macro'>vec</span><span class='macro'>!</span>[<span class='string'>&quot;EventA&quot;</span>, <span class='string'>&quot;EventB&quot;</span>, <span class='string'>&quot;EventC&quot;</span>, <span class='string'>&quot;EventC&quot;</span>]);
+        <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='macro'>vec</span><span class='macro'>!</span>[<span class='string'>&quot;EventA&quot;</span>, <span class='string'>&quot;EventB&quot;</span>, <span class='string'>&quot;EventC&quot;</span>, <span class='string'>&quot;EventC&quot;</span>, <span class='string'>&quot;EventC&quot;</span>]);
     }     
 
     <span class='attribute'>#[<span class='ident'>test</span>]</span>
@@ -2356,10 +2502,7 @@ el.to_promise().finally_sync(|res| {  // res: Arc&lt;Mutex&lt;Vec&lt;Ev&gt;&gt;&
         <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>event_loop</span>.<span class='ident'>emit</span>(<span class='string'>&quot;EventB&quot;</span>), <span class='prelude-val'>Ok</span>(()));
         <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>event_loop</span>.<span class='ident'>emit</span>(<span class='string'>&quot;EventC&quot;</span>), <span class='prelude-val'>Ok</span>(()));
         <span class='kw'>let</span> <span class='ident'>res</span> <span class='op'>=</span> <span class='ident'>event_loop</span>.<span class='ident'>finish</span>().<span class='ident'>to_promise</span>().<span class='ident'>sync</span>().<span class='ident'>unwrap</span>();
-        <span class='kw'>let</span> <span class='ident'>lock</span> <span class='op'>=</span> <span class='ident'>res</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>();
-        <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>lock</span>.<span class='ident'>len</span>(), <span class='number'>0</span>);
-        <span class='kw'>let</span> <span class='ident'>v_lock</span> <span class='op'>=</span> <span class='ident'>v</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>();        
-        <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='op'>*</span><span class='ident'>v_lock</span>, <span class='macro'>vec</span><span class='macro'>!</span>[<span class='string'>&quot;EventATreated&quot;</span>, <span class='string'>&quot;EventOtherTreated&quot;</span>]);
+        <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>.<span class='ident'>len</span>(), <span class='number'>0</span>);
     }
 
     <span class='attribute'>#[<span class='ident'>test</span>]</span>
@@ -2380,49 +2523,48 @@ el.to_promise().finally_sync(|res| {  // res: Arc&lt;Mutex&lt;Vec&lt;Ev&gt;&gt;&
         <span class='macro'>assert</span><span class='macro'>!</span>(<span class='ident'>event_loop</span>.<span class='ident'>emit</span>(<span class='ident'>Event</span>::<span class='ident'>Goodbye</span>(<span class='string'>&quot;BCN&quot;</span>.<span class='ident'>to_string</span>())).<span class='ident'>is_ok</span>());
         <span class='macro'>assert</span><span class='macro'>!</span>(<span class='ident'>event_loop</span>.<span class='ident'>emit</span>(<span class='ident'>Event</span>::<span class='ident'>Goodbye</span>(<span class='string'>&quot;MAD&quot;</span>.<span class='ident'>to_string</span>())).<span class='ident'>is_ok</span>());
         <span class='kw'>let</span> <span class='ident'>res</span> <span class='op'>=</span> <span class='ident'>event_loop</span>.<span class='ident'>to_promise</span>().<span class='ident'>sync</span>().<span class='ident'>unwrap</span>();
-        <span class='kw'>let</span> <span class='ident'>lock</span> <span class='op'>=</span> <span class='ident'>res</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>();
-        <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>lock</span>.<span class='ident'>len</span>(), <span class='number'>0</span>);
-        <span class='kw'>let</span> <span class='ident'>v_lock</span> <span class='op'>=</span> <span class='ident'>v</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>();
-        <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='op'>*</span><span class='ident'>v_lock</span>, <span class='macro'>vec</span><span class='macro'>!</span>[<span class='string'>&quot;BCN&quot;</span>, <span class='string'>&quot;MAD&quot;</span>] );
+        <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>.<span class='ident'>len</span>(), <span class='number'>0</span>);
     }    
 
     <span class='attribute'>#[<span class='ident'>test</span>]</span>
-    <span class='kw'>fn</span> <span class='ident'>event_loop_on_collect_1</span>() {
-        <span class='kw'>let</span> <span class='ident'>event_loop</span> <span class='op'>=</span> <span class='ident'>EventLoop</span>::<span class='ident'>on_collect</span>(<span class='op'>|</span><span class='ident'>event</span><span class='op'>|</span> {
+    <span class='kw'>fn</span> <span class='ident'>event_loop_on_managed_1</span>() {
+        <span class='kw'>let</span> <span class='ident'>event_loop</span> <span class='op'>=</span> <span class='ident'>EventLoop</span>::<span class='ident'>on_managed</span>(<span class='op'>|</span><span class='ident'>event</span><span class='op'>|</span> {
             <span class='kw'>match</span> <span class='ident'>event</span> {
-                <span class='string'>&quot;EventA&quot;</span> <span class='op'>=&gt;</span> <span class='prelude-val'>Some</span>(<span class='string'>&quot;EventATreated&quot;</span>),
-                <span class='string'>&quot;EventB&quot;</span> <span class='op'>=&gt;</span> <span class='prelude-val'>None</span>,
-                _ <span class='op'>=&gt;</span> <span class='prelude-val'>Some</span>(<span class='string'>&quot;EventOtherTreated&quot;</span>)
+                <span class='string'>&quot;EventA&quot;</span> <span class='op'>=&gt;</span> <span class='ident'>Emit</span>::<span class='ident'>Event</span>(<span class='string'>&quot;EventATreated&quot;</span>),
+                <span class='string'>&quot;EventB&quot;</span> <span class='op'>=&gt;</span> <span class='ident'>Emit</span>::<span class='ident'>Continue</span>,
+                <span class='string'>&quot;EventStop&quot;</span> <span class='op'>=&gt;</span> <span class='ident'>Emit</span>::<span class='ident'>Stop</span>,
+                _ <span class='op'>=&gt;</span> <span class='ident'>Emit</span>::<span class='ident'>Event</span>(<span class='string'>&quot;EventOtherTreated&quot;</span>)
             }
         });
         <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>event_loop</span>.<span class='ident'>emit</span>(<span class='string'>&quot;EventA&quot;</span>), <span class='prelude-val'>Ok</span>(()));
         <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>event_loop</span>.<span class='ident'>emit</span>(<span class='string'>&quot;EventB&quot;</span>), <span class='prelude-val'>Ok</span>(()));
         <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>event_loop</span>.<span class='ident'>emit</span>(<span class='string'>&quot;EventC&quot;</span>), <span class='prelude-val'>Ok</span>(()));
+        <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>event_loop</span>.<span class='ident'>emit</span>(<span class='string'>&quot;EventStop&quot;</span>), <span class='prelude-val'>Ok</span>(()));
+        <span class='ident'>thread</span>::<span class='ident'>sleep_ms</span>(<span class='number'>75</span>);
+        <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>event_loop</span>.<span class='ident'>emit</span>(<span class='string'>&quot;EventE&quot;</span>), <span class='prelude-val'>Err</span>(<span class='string'>&quot;EventE&quot;</span>));
         <span class='kw'>let</span> <span class='ident'>res</span> <span class='op'>=</span> <span class='ident'>event_loop</span>.<span class='ident'>finish</span>().<span class='ident'>to_promise</span>().<span class='ident'>sync</span>().<span class='ident'>unwrap</span>();
-        <span class='kw'>let</span> <span class='ident'>lock</span> <span class='op'>=</span> <span class='ident'>res</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>();
-        <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='op'>*</span><span class='ident'>lock</span>, <span class='macro'>vec</span><span class='macro'>!</span>[<span class='string'>&quot;EventATreated&quot;</span>, <span class='string'>&quot;EventOtherTreated&quot;</span>]);
+        <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='macro'>vec</span><span class='macro'>!</span>[<span class='string'>&quot;EventATreated&quot;</span>, <span class='string'>&quot;EventOtherTreated&quot;</span>]);
     }
 
     <span class='attribute'>#[<span class='ident'>test</span>]</span>
-    <span class='kw'>fn</span> <span class='ident'>event_loop_on_collect_2</span>() {
+    <span class='kw'>fn</span> <span class='ident'>event_loop_on_managed_2</span>() {
         <span class='kw'>enum</span> <span class='ident'>Event</span> {
             <span class='ident'>Hello</span>(<span class='ident'>String</span>),
             <span class='ident'>Goodbye</span>(<span class='ident'>String</span>)
         }
-        <span class='kw'>let</span> <span class='ident'>event_loop</span> <span class='op'>=</span> <span class='ident'>EventLoop</span>::<span class='ident'>on_collect</span>(<span class='op'>|</span><span class='ident'>event</span><span class='op'>|</span> {
+        <span class='kw'>let</span> <span class='ident'>event_loop</span> <span class='op'>=</span> <span class='ident'>EventLoop</span>::<span class='ident'>on_managed</span>(<span class='op'>|</span><span class='ident'>event</span><span class='op'>|</span> {
             <span class='kw'>match</span> <span class='ident'>event</span> {
-                <span class='ident'>Event</span>::<span class='ident'>Hello</span>(_) <span class='op'>=&gt;</span> <span class='prelude-val'>None</span>,
-                <span class='ident'>Event</span>::<span class='ident'>Goodbye</span>(<span class='ident'>v</span>) <span class='op'>=&gt;</span> <span class='prelude-val'>Some</span>(<span class='ident'>Event</span>::<span class='ident'>Goodbye</span>(<span class='ident'>v</span>)),
+                <span class='ident'>Event</span>::<span class='ident'>Hello</span>(_) <span class='op'>=&gt;</span> <span class='ident'>Emit</span>::<span class='ident'>Continue</span>,
+                <span class='ident'>Event</span>::<span class='ident'>Goodbye</span>(<span class='ident'>v</span>) <span class='op'>=&gt;</span> <span class='ident'>Emit</span>::<span class='ident'>Event</span>(<span class='ident'>Event</span>::<span class='ident'>Goodbye</span>(<span class='ident'>v</span>)),
             }
         }).<span class='ident'>finish_in_ms</span>(<span class='number'>100</span>);
         <span class='macro'>assert</span><span class='macro'>!</span>(<span class='ident'>event_loop</span>.<span class='ident'>emit</span>(<span class='ident'>Event</span>::<span class='ident'>Hello</span>(<span class='string'>&quot;World&quot;</span>.<span class='ident'>to_string</span>())).<span class='ident'>is_ok</span>());
         <span class='macro'>assert</span><span class='macro'>!</span>(<span class='ident'>event_loop</span>.<span class='ident'>emit</span>(<span class='ident'>Event</span>::<span class='ident'>Goodbye</span>(<span class='string'>&quot;BCN&quot;</span>.<span class='ident'>to_string</span>())).<span class='ident'>is_ok</span>());
         <span class='macro'>assert</span><span class='macro'>!</span>(<span class='ident'>event_loop</span>.<span class='ident'>emit</span>(<span class='ident'>Event</span>::<span class='ident'>Goodbye</span>(<span class='string'>&quot;MAD&quot;</span>.<span class='ident'>to_string</span>())).<span class='ident'>is_ok</span>());
         <span class='kw'>let</span> <span class='ident'>res</span> <span class='op'>=</span> <span class='ident'>event_loop</span>.<span class='ident'>to_promise</span>().<span class='ident'>sync</span>().<span class='ident'>unwrap</span>();
-        <span class='kw'>let</span> <span class='ident'>lock</span> <span class='op'>=</span> <span class='ident'>res</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>();
-        <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>lock</span>.<span class='ident'>len</span>(), <span class='number'>2</span>);
-        <span class='kw'>match</span> <span class='ident'>lock</span>[<span class='number'>0</span>] { <span class='ident'>Event</span>::<span class='ident'>Goodbye</span>(<span class='kw-2'>ref</span> <span class='ident'>v</span>) <span class='op'>=&gt;</span> <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>v</span>, <span class='string'>&quot;BCN&quot;</span>) , _ <span class='op'>=&gt;</span> <span class='macro'>panic</span><span class='macro'>!</span>() };
-        <span class='kw'>match</span> <span class='ident'>lock</span>[<span class='number'>1</span>] { <span class='ident'>Event</span>::<span class='ident'>Goodbye</span>(<span class='kw-2'>ref</span> <span class='ident'>v</span>) <span class='op'>=&gt;</span> <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>v</span>, <span class='string'>&quot;MAD&quot;</span>) , _ <span class='op'>=&gt;</span> <span class='macro'>panic</span><span class='macro'>!</span>() };
+        <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>.<span class='ident'>len</span>(), <span class='number'>2</span>);
+        <span class='kw'>match</span> <span class='ident'>res</span>[<span class='number'>0</span>] { <span class='ident'>Event</span>::<span class='ident'>Goodbye</span>(<span class='kw-2'>ref</span> <span class='ident'>v</span>) <span class='op'>=&gt;</span> <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>v</span>, <span class='string'>&quot;BCN&quot;</span>) , _ <span class='op'>=&gt;</span> <span class='macro'>panic</span><span class='macro'>!</span>() };
+        <span class='kw'>match</span> <span class='ident'>res</span>[<span class='number'>1</span>] { <span class='ident'>Event</span>::<span class='ident'>Goodbye</span>(<span class='kw-2'>ref</span> <span class='ident'>v</span>) <span class='op'>=&gt;</span> <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>v</span>, <span class='string'>&quot;MAD&quot;</span>) , _ <span class='op'>=&gt;</span> <span class='macro'>panic</span><span class='macro'>!</span>() };
     }        
 }
 </pre>
