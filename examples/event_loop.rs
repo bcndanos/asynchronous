@@ -1,6 +1,6 @@
 extern crate asynchronous;
 
-use asynchronous::{Promise, EventLoop};
+use asynchronous::{Promise, EventLoop, Emit};
 use std::sync::mpsc;
 
 #[derive(Debug)]
@@ -11,28 +11,28 @@ enum Event {
 
 
 fn function_test() {
-    let event_loop_a = EventLoop::on_collect(move |event| {   
+    let event_loop_a = EventLoop::on_managed(move |event| {   
         match event {
             Event::Hello(t) => {
                 println!("Hello {}", t);
-                None
+                Emit::Continue
             },
             Event::Goodbye(v) => {
                 println!("Farewell {}", v);
-                Some(Event::Goodbye(v))
+                Emit::Event(Event::Goodbye(v))
             },
         }        
     }).finish_in_ms(50);
     
     let event_loop_b = EventLoop::new();
 
-    let e_l = event_loop_a.clone();
+    let event_handler = event_loop_a.get_handler();
     let promise = Promise::<_,()>::new(move || {    
-        &e_l.emit(Event::Hello("Inside Promise".to_string()));
-        Ok(e_l)
-    }).success(|e_l| {
-        &e_l.emit(Event::Goodbye(1));
-        Ok(e_l)
+        &event_handler.emit(Event::Hello("Inside Promise".to_string()));
+        Ok(event_handler)
+    }).success(|event_handler| {
+        &event_handler.emit(Event::Goodbye(1));
+        Ok(event_handler)
     });
 
     &event_loop_a.emit(Event::Hello("World".to_string()));
@@ -42,14 +42,14 @@ fn function_test() {
     let x = std::sync::Arc::new(std::sync::Mutex::new(0));
     event_loop_b.emit_until(move || {       
         let mut lock_x = x.lock().unwrap(); *lock_x += 1;
-        if *lock_x <= 3 { Some("TestB") } else { None }
+        if *lock_x <= 3 { Emit::Event("TestB") } else { Emit::Stop }
     });
 
     let (tx,rx) = mpsc::channel();    
     event_loop_b.emit_until(move || {
         match rx.recv() {
-            Ok(v) => Some(v),
-            Err(_) => None
+            Ok(v) => Emit::Event(v),
+            Err(_) => Emit::Stop
         }
     });
     for _ in 0..3 { &tx.send("TestC"); }
@@ -64,15 +64,13 @@ fn function_test() {
 
     
     &event_loop_a.to_promise().then(|res| {
-        let lock = res.lock().unwrap();
-        println!("Event Loop a: {:?} ", *lock);
-        event_loop_b.finish().to_promise().sync()
+        println!("Event Loop a: {:?} ", res);
+        event_loop_b.finish_in_ms(200).to_promise().sync()
     }, |error| {
         println!("Error in loop a: {:?}", error);
         Err(())
     }).success(|res| {
-        let lock = res.lock().unwrap();
-        println!("Event Loop b: {:?} ", *lock);
+        println!("Event Loop b: {:?} ", res);
         Ok(())
     }).sync();
     

@@ -84,8 +84,8 @@ let el = EventLoop::new().finish_in_ms(100);
 el.emit("Event1");
 el.emit("Event2");
 // Do something here
-el.to_promise().finally_sync(|res| {  // res: Arc<Mutex<Vec<Ev>>>
-    assert_eq!(*res.lock().unwrap(), vec!["Event1", "Event2"]);
+el.to_promise().finally_sync(|res| {  // res: Vec<Ev>
+    assert_eq!(res, vec!["Event1", "Event2"]);
 }, |error| {
     // Check Errors
 });
@@ -503,23 +503,118 @@ impl<T,E> Promise<T,E> where T: Send + 'static , E: Send + 'static {
     }   
 }
 
-///Executes a task in background collecting events from other threads
-pub struct EventLoop<Ev> {
-    tx       : mpsc::Sender<Option<Ev>>,
-    entries  : Arc<Mutex<Vec<Ev>>>,
+// Event Loops //
+
+/// Enum representing type of Emit in loops
+pub enum Emit<Ev> {
+    /// Generates a new event
+    Event(Ev),   
+    /// Continues the loop
+    Continue,    
+    /// Stops the loop
+    Stop         
+}
+
+///Event Loop wrapper that can be cloned to pass through threads
+pub struct EventLoopHandler<Ev> {
+    tx       : mpsc::Sender<Option<Ev>>,    
     finisher : Arc<(Mutex<bool>, Condvar)>,
     finished : Arc<Mutex<bool>>,
 }
 
-impl<Ev> Clone for EventLoop<Ev> {
-    fn clone(&self) -> EventLoop<Ev> {
-        EventLoop {
+impl<Ev> Clone for EventLoopHandler<Ev> {
+    fn clone(&self) -> EventLoopHandler<Ev> {
+        EventLoopHandler {
             tx       : self.tx.clone(),
-            entries  : self.entries.clone(),
             finisher : self.finisher.clone(),
             finished : self.finished.clone(),
         }
-    } 
+    }
+}
+
+impl<Ev> EventLoopHandler<Ev>  where Ev: Send + 'static {
+    /// Triggers an event "Ev" once. Returns the same event if the event loop is not active.
+    pub fn emit(&self, event:Ev) -> Result<(), Ev>{         
+        if self.is_active() {
+            match self.tx.send(Some(event)) {
+                Ok(_) => Ok(()),
+                Err(e) => Err(e.0.unwrap())            
+            }
+        } else {
+            Err(event)
+        }
+    }
+
+    /// Triggers an event "Ev" until the return of the "clousure" is None
+    /// 
+    /// ```rust
+    /// use asynchronous::{EventLoop, Emit};
+    /// 
+    /// let el = EventLoop::new();
+    /// let x = std::sync::Arc::new(std::sync::Mutex::new(0));
+    /// el.emit_until(move || {
+    ///    let mut lock_x = x.lock().unwrap(); *lock_x += 1;
+    ///    if *lock_x <= 3 { Emit::Event("Event Test") } else { Emit::Stop }
+    /// });    
+    /// // Do something here
+    /// el.finish_in_ms(100).to_promise().finally_sync(|res| {  // res: Vec<Ev>
+    ///     assert_eq!(res, vec!["Event Test", "Event Test", "Event Test"]);
+    /// }, |error| {
+    ///     // Check Errors
+    /// });
+    /// ```     
+    pub fn emit_until<F>(&self, f:F)  where F : Send + 'static + Fn() -> Emit<Ev> {
+        let handler = self.clone();
+        thread::spawn(move || {
+            loop {                
+                match f() {
+                    Emit::Event(e) => match handler.emit(e) {
+                        Ok(_) => (),
+                        Err(_) => break,
+                    },
+                    Emit::Continue => continue,
+                    Emit::Stop => break,
+                };
+            }
+        });
+    }    
+
+    /// Returns true if the event loop is running
+    pub fn is_active(&self) -> bool {
+        let lock_finished = self.finished.lock().unwrap();
+        !*lock_finished
+    }     
+
+    /// Finishes the event loop immediately.
+    pub fn finish(self) -> EventLoopHandler<Ev> { 
+        {
+            let mut lock_finished = self.finished.lock().unwrap();
+            if !*lock_finished {
+               *lock_finished = true;
+               let _ = self.tx.send(None);
+            }
+        }
+        self
+    }
+
+    /// Finishes the event loop in N milliseconds
+    pub fn finish_in_ms(self, duration_ms:u32) -> EventLoopHandler<Ev> {
+        {
+            let handler = self.clone();
+            thread::spawn(move|| {
+                thread::sleep_ms(duration_ms);    
+                let _ = handler.finish();            
+            });
+        }
+        self
+    }            
+
+}
+
+///Executes a task in background collecting events from other threads
+pub struct EventLoop<Ev> {
+    handler  : EventLoopHandler<Ev>,
+    receiver : mpsc::Receiver<Ev>,
 }
 
 impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
@@ -533,8 +628,8 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
     /// el.emit("Event1");
     /// el.emit("Event2");
     /// // Do something here
-    /// el.to_promise().finally_sync(|res| {  // res: Arc<Mutex<Vec<Ev>>>
-    ///     assert_eq!(*res.lock().unwrap(), vec!["Event1", "Event2"]);
+    /// el.to_promise().finally_sync(|res| {  // res: Vec<Ev>
+    ///     assert_eq!(res, vec!["Event1", "Event2"]);
     /// }, |error| {
     ///     // Check Errors
     /// });
@@ -543,16 +638,12 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
         let pair = Arc::new((Mutex::new(false), Condvar::new()));        
         let pair_cloned = pair.clone();
         let (tx,rx) = mpsc::channel();
-        let entries = Arc::new(Mutex::new(Vec::new()));
-        let entries_cloned = entries.clone(); 
+        let (sender, receiver) = mpsc::channel();
         thread::spawn(move || {
             loop {
                 match rx.recv() { 
                     Ok(t) =>  match t {
-                        Some(v) => {
-                            let mut lock = entries_cloned.lock().unwrap();
-                            lock.push(v);
-                        }, 
+                        Some(v) => sender.send(v).unwrap(),
                         None => break 
                     },                    
                     Err(_) => break
@@ -564,10 +655,12 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
             cvar.notify_one();            
         });
         EventLoop {
-            tx       : tx,
-            entries  : entries,
-            finisher : pair,
-            finished : Arc::new(Mutex::new(false)),
+            handler  : EventLoopHandler {
+                tx       : tx,                
+                finisher : pair,
+                finished : Arc::new(Mutex::new(false)),                
+            },
+            receiver : receiver,
         }
     }
 
@@ -586,8 +679,8 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
     /// el.emit(MiEvents::Hello("World".to_string()));
     /// el.emit(MiEvents::Goodbye(3));
     /// // Do something here
-    /// el.finish().to_promise().finally_sync(|res| {  // res: Arc<Mutex<Vec<Ev>>>
-    ///     assert_eq!(res.lock().unwrap().len(), 0);
+    /// el.finish().to_promise().finally_sync(|res| {  // res: Vec<Ev>
+    ///     assert_eq!(res.len(), 0);
     /// }, |error| {
     ///     // Check Errors
     /// });
@@ -596,7 +689,7 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
         let pair = Arc::new((Mutex::new(false), Condvar::new()));    
         let pair_cloned = pair.clone();
         let (tx,rx) = mpsc::channel();
-        let entries = Arc::new(Mutex::new(Vec::new()));
+        let (_, receiver) = mpsc::channel();
         thread::spawn(move || {
             loop {
                 match rx.recv() { 
@@ -613,42 +706,42 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
             cvar.notify_one();             
         });
         EventLoop {
-            tx       : tx,
-            entries  : entries,
-            finisher : pair,
-            finished : Arc::new(Mutex::new(false)),
+            handler  : EventLoopHandler {
+                tx       : tx,                
+                finisher : pair,
+                finished : Arc::new(Mutex::new(false)),                
+            },
+            receiver : receiver,
         }
     }
 
     /// Creates a new Event Loop, parses all the events produced and collects what you want into a vector
     /// 
     /// ```rust
-    /// use asynchronous::EventLoop;
+    /// use asynchronous::{EventLoop, Emit};
     /// enum MiEvents { Hello(String), Goodbye(u32)}
     /// 
-    /// let el = EventLoop::on_collect(|event| {
+    /// let el = EventLoop::on_managed(|event| {
     ///    match event {
-    ///       MiEvents::Hello(s) => { println!("Hello {}", s); None },
-    ///       MiEvents::Goodbye(v) => Some(MiEvents::Goodbye(v)),
+    ///       MiEvents::Hello(s) => { println!("Hello {}", s); Emit::Continue },
+    ///       MiEvents::Goodbye(v) => Emit::Event(MiEvents::Goodbye(v)),
     ///    }
     /// });
     /// el.emit(MiEvents::Hello("World".to_string()));
     /// el.emit(MiEvents::Goodbye(555));
     /// // Do something here
-    /// el.finish().to_promise().finally_sync(|res| {  // res: Arc<Mutex<Vec<Ev>>>
-    ///     let lock = res.lock().unwrap();
-    ///     assert_eq!(lock.len(), 1);
-    ///     match lock[0] { MiEvents::Goodbye(v) => assert_eq!(v, 555), _=> () };
+    /// el.finish().to_promise().finally_sync(|res| {  // res: Vec<Ev>
+    ///     assert_eq!(res.len(), 1);
+    ///     match res[0] { MiEvents::Goodbye(v) => assert_eq!(v, 555), _=> () };
     /// }, |error| {
     ///     // Check Errors
     /// });
     /// ```         
-    pub fn on_collect<F>(f:F) -> EventLoop<Ev> where F : Send + 'static + Fn(Ev) -> Option<Ev> {      
+    pub fn on_managed<F>(f:F) -> EventLoop<Ev> where F : Send + 'static + Fn(Ev) -> Emit<Ev> {      
         let pair = Arc::new((Mutex::new(false), Condvar::new()));    
         let pair_cloned = pair.clone();
         let (tx,rx) = mpsc::channel();
-        let entries = Arc::new(Mutex::new(Vec::new()));
-        let entries_cloned = entries.clone(); 
+        let (sender, receiver) = mpsc::channel();
         thread::spawn(move || {
             loop {
                 let rec = match rx.recv() { 
@@ -659,11 +752,9 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
                     Err(_) => break
                 };
                 match f(rec) {
-                    Some(e) => {
-                        let mut lock = entries_cloned.lock().unwrap();
-                        lock.push(e);
-                    },
-                    None => ()
+                    Emit::Event(e) => sender.send(e).unwrap(),
+                    Emit::Continue => (),
+                    Emit::Stop => break,
                 }
             }
             let &(ref lock, ref cvar) = &*pair_cloned;        
@@ -672,98 +763,85 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
             cvar.notify_one();             
         });
         EventLoop {
-            tx       : tx,
-            entries  : entries,
-            finisher : pair,
-            finished : Arc::new(Mutex::new(false)),
+            handler  : EventLoopHandler {
+                tx       : tx,                
+                finisher : pair,
+                finished : Arc::new(Mutex::new(false)),
+            },
+            receiver : receiver,
         }        
     }
 
     /// Triggers an event "Ev" once. Returns the same event if the event loop is not active.
     pub fn emit(&self, event:Ev) -> Result<(), Ev>{         
-        if self.is_active() {
-            match self.tx.send(Some(event)) {
-                Ok(_) => Ok(()),
-                Err(e) => Err(e.0.unwrap())            
-            }
-        } else {
-            Err(event)
-        }
+        self.handler.emit(event)
     }
 
     /// Triggers an event "Ev" until the return of the "clousure" is None
     /// 
     /// ```rust
-    /// use asynchronous::EventLoop;
+    /// use asynchronous::{EventLoop, Emit};
     /// 
     /// let el = EventLoop::new();
     /// let x = std::sync::Arc::new(std::sync::Mutex::new(0));
     /// el.emit_until(move || {
     ///    let mut lock_x = x.lock().unwrap(); *lock_x += 1;
-    ///    if *lock_x <= 3 { Some("Event Test") } else { None }
+    ///    if *lock_x <= 3 { Emit::Event("Event Test") } else { Emit::Stop }
     /// });    
     /// // Do something here
-    /// el.finish_in_ms(100).to_promise().finally_sync(|res| {  // res: Arc<Mutex<T>>
-    ///     assert_eq!(*res.lock().unwrap(), vec!["Event Test", "Event Test", "Event Test"]);
+    /// el.finish_in_ms(100).to_promise().finally_sync(|res| {  // res: Vec<Ev>
+    ///     assert_eq!(res, vec!["Event Test", "Event Test", "Event Test"]);
     /// }, |error| {
     ///     // Check Errors
     /// });
     /// ```     
-    pub fn emit_until<F>(&self, f:F)  where F : Send + 'static + Fn() -> Option<Ev> {
-        let self_cloned = self.clone();
-        thread::spawn(move || {
-            loop {                
-                match f() {
-                    Some(e) => match self_cloned.emit(e) {
-                        Ok(_) => (),
-                        Err(_) => break,
-                    },
-                    None => break,
-                };
-            }
-        });
+    pub fn emit_until<F>(&self, f:F)  where F : Send + 'static + Fn() -> Emit<Ev> {
+        self.handler.emit_until(f);
     }
 
     /// Finishes the event loop immediately.
     pub fn finish(self) -> EventLoop<Ev> { 
-        {
-            let mut lock_finished = self.finished.lock().unwrap();
-            if !*lock_finished {
-               *lock_finished = true;
-               let _ = self.tx.send(None);
-            }
+        EventLoop {
+            receiver : self.receiver,
+            handler  : self.handler.finish(),
         }
-        self
     }
 
     /// Finishes the event loop in N milliseconds
     pub fn finish_in_ms(self, duration_ms:u32) -> EventLoop<Ev> {
-        {
-            let self_cloned = self.clone();        
-            thread::spawn(move|| {
-                thread::sleep_ms(duration_ms);    
-                let _ = self_cloned.finish();            
-            });
+        EventLoop {
+            receiver : self.receiver,
+            handler  : self.handler.finish_in_ms(duration_ms),
         }
-        self
     }        
 
+    /// Returns true if the event loop is running
+    pub fn is_active(&self) -> bool {
+        self.handler.is_active()
+    } 
+
+    /// Returns a handler to Event Emitter
+    pub fn get_handler(&self) -> EventLoopHandler<Ev> {
+        self.handler.clone()
+    }
+
     /// Once the event loop is finished, the promise collects the results.
-    pub fn to_promise(self) -> Promise<Arc<Mutex<Vec<Ev>>>,()> {
-        let self_cloned = self.clone();
+    pub fn to_promise(self) -> Promise<Vec<Ev>,()> {
+        let handler = self.get_handler();
         Promise::new(move || { 
-            let &(ref lock, ref cvar) = &*self_cloned.finisher;
+            let &(ref lock, ref cvar) = &*handler.finisher;
             let mut finished = lock.lock().unwrap();    
             while !*finished {  finished = cvar.wait(finished).unwrap(); }                           
-            Ok(self_cloned.entries)
+            let mut vec = Vec::new();
+            loop {
+                match self.receiver.recv() {
+                    Ok(val) => vec.push(val),
+                    Err(_) => break,
+                }
+            }
+            Ok(vec)
         })
-    }     
-
-    /// Returns if the event loop is running
-    pub fn is_active(&self) -> bool {
-        let lock_finished = self.finished.lock().unwrap();
-        !*lock_finished
-    } 
+    }         
 }
 
 #[cfg(test)]
@@ -1061,8 +1139,7 @@ mod test {
         assert_eq!(event_loop.emit("EventB"), Ok(()));
         assert_eq!(event_loop.emit("EventC"), Ok(()));
         let res = event_loop.finish().to_promise().sync().unwrap();
-        let lock = res.lock().unwrap();
-        assert_eq!(*lock, vec!["EventA", "EventB", "EventC"]);
+        assert_eq!(res, vec!["EventA", "EventB", "EventC"]);
     }
 
     #[test]
@@ -1073,8 +1150,7 @@ mod test {
         thread::sleep_ms(100);
         assert_eq!(event_loop.emit("EventC"), Err("EventC"));
         let res = event_loop.finish().to_promise().sync().unwrap();
-        let lock = res.lock().unwrap();
-        assert_eq!(*lock, vec!["EventA", "EventB"]);
+        assert_eq!(res, vec!["EventA", "EventB"]);
     }    
 
     #[test]
@@ -1086,24 +1162,23 @@ mod test {
         assert_eq!(event_loop.emit("EventC"), Err("EventC"));
         assert_eq!(event_loop.is_active(), false);
         let res = event_loop.to_promise().sync().unwrap();
-        let lock = res.lock().unwrap();
-        assert_eq!(*lock, vec!["EventA", "EventB"]);
+        assert_eq!(res, vec!["EventA", "EventB"]);
     }        
 
     #[test]
     fn event_loop_4() {
-        let event_loop = EventLoop::new().finish_in_ms(70);
+        let event_loop = EventLoop::new().finish_in_ms(120);
         assert_eq!(event_loop.emit("EventA"), Ok(()));        
         assert_eq!(event_loop.emit("EventB"), Ok(()));
         let x = Arc::new(Mutex::new(0));
         event_loop.emit_until(move || {
             thread::sleep_ms(25);
             let mut lock_x = x.lock().unwrap(); *lock_x += 1;
-            if *lock_x <= 3 { Some("EventC") } else { None }
+            if *lock_x == 2 { return Emit::Continue }
+            if *lock_x <= 5 { Emit::Event("EventC") } else { Emit::Stop }
         });
         let res = event_loop.to_promise().sync().unwrap();
-        let lock = res.lock().unwrap();
-        assert_eq!(*lock, vec!["EventA", "EventB", "EventC", "EventC"]);
+        assert_eq!(res, vec!["EventA", "EventB", "EventC", "EventC", "EventC"]);
     }     
 
     #[test]
@@ -1121,10 +1196,7 @@ mod test {
         assert_eq!(event_loop.emit("EventB"), Ok(()));
         assert_eq!(event_loop.emit("EventC"), Ok(()));
         let res = event_loop.finish().to_promise().sync().unwrap();
-        let lock = res.lock().unwrap();
-        assert_eq!(lock.len(), 0);
-        let v_lock = v.lock().unwrap();        
-        assert_eq!(*v_lock, vec!["EventATreated", "EventOtherTreated"]);
+        assert_eq!(res.len(), 0);
     }
 
     #[test]
@@ -1145,48 +1217,47 @@ mod test {
         assert!(event_loop.emit(Event::Goodbye("BCN".to_string())).is_ok());
         assert!(event_loop.emit(Event::Goodbye("MAD".to_string())).is_ok());
         let res = event_loop.to_promise().sync().unwrap();
-        let lock = res.lock().unwrap();
-        assert_eq!(lock.len(), 0);
-        let v_lock = v.lock().unwrap();
-        assert_eq!(*v_lock, vec!["BCN", "MAD"] );
+        assert_eq!(res.len(), 0);
     }    
 
     #[test]
-    fn event_loop_on_collect_1() {
-        let event_loop = EventLoop::on_collect(|event| {
+    fn event_loop_on_managed_1() {
+        let event_loop = EventLoop::on_managed(|event| {
             match event {
-                "EventA" => Some("EventATreated"),
-                "EventB" => None,
-                _ => Some("EventOtherTreated")
+                "EventA" => Emit::Event("EventATreated"),
+                "EventB" => Emit::Continue,
+                "EventStop" => Emit::Stop,
+                _ => Emit::Event("EventOtherTreated")
             }
         });
         assert_eq!(event_loop.emit("EventA"), Ok(()));
         assert_eq!(event_loop.emit("EventB"), Ok(()));
         assert_eq!(event_loop.emit("EventC"), Ok(()));
+        assert_eq!(event_loop.emit("EventStop"), Ok(()));
+        thread::sleep_ms(75);
+        assert_eq!(event_loop.emit("EventE"), Err("EventE"));
         let res = event_loop.finish().to_promise().sync().unwrap();
-        let lock = res.lock().unwrap();
-        assert_eq!(*lock, vec!["EventATreated", "EventOtherTreated"]);
+        assert_eq!(res, vec!["EventATreated", "EventOtherTreated"]);
     }
 
     #[test]
-    fn event_loop_on_collect_2() {
+    fn event_loop_on_managed_2() {
         enum Event {
             Hello(String),
             Goodbye(String)
         }
-        let event_loop = EventLoop::on_collect(|event| {
+        let event_loop = EventLoop::on_managed(|event| {
             match event {
-                Event::Hello(_) => None,
-                Event::Goodbye(v) => Some(Event::Goodbye(v)),
+                Event::Hello(_) => Emit::Continue,
+                Event::Goodbye(v) => Emit::Event(Event::Goodbye(v)),
             }
         }).finish_in_ms(100);
         assert!(event_loop.emit(Event::Hello("World".to_string())).is_ok());
         assert!(event_loop.emit(Event::Goodbye("BCN".to_string())).is_ok());
         assert!(event_loop.emit(Event::Goodbye("MAD".to_string())).is_ok());
         let res = event_loop.to_promise().sync().unwrap();
-        let lock = res.lock().unwrap();
-        assert_eq!(lock.len(), 2);
-        match lock[0] { Event::Goodbye(ref v) => assert_eq!(v, "BCN") , _ => panic!() };
-        match lock[1] { Event::Goodbye(ref v) => assert_eq!(v, "MAD") , _ => panic!() };
+        assert_eq!(res.len(), 2);
+        match res[0] { Event::Goodbye(ref v) => assert_eq!(v, "BCN") , _ => panic!() };
+        match res[1] { Event::Goodbye(ref v) => assert_eq!(v, "MAD") , _ => panic!() };
     }        
 }
