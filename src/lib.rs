@@ -309,7 +309,7 @@ impl<T,E> Deferred<T,E> where T: Send + 'static , E: Send + 'static {
                 }
                 if active_process == 0 { break }
             }                   
-            if num_first > 0 && num_results_received >= num_first { is_error = false }
+            if num_first > 0 { is_error = num_results_received < num_first }
             let ok_results:Result<Vec<T>, Vec<Result<T,E>>> = match is_error {
                 false => {
                     let mut v:Vec<T> = Vec::new();
@@ -1201,6 +1201,17 @@ mod test {
             }, |err| {
                 assert_eq!(err.len(), 10);  
             });  
+
+        let mut v = vec![];
+        for i in 0..5 {
+            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
+        }
+        let _ = Deferred::first_to_promise(7, true, v, ControlFlow::ParallelLimit(3))
+            .finally_sync(|res| {                                           
+                unreachable!("{:?}", res);                                                              
+            }, |err| {
+                assert_eq!(err.len(), 5);  
+            });              
     }                
 
     #[test]
@@ -1266,6 +1277,17 @@ mod test {
             }, |err| {
                 assert_eq!(err.len(), 10);  
             }); 
+
+        let mut v = vec![];
+        for i in 0..5 {
+            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
+        }
+        let _ = Deferred::first_to_promise(7, false, v, ControlFlow::ParallelLimit(3))
+            .finally_sync(|res| {                                           
+                unreachable!("{:?}", res);                                                              
+            }, |err| {
+                assert_eq!(err.len(), 5);  
+            });                          
     }                    
 
     #[test]
