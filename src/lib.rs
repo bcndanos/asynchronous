@@ -194,8 +194,7 @@ impl<T,E> Deferred<T,E> where T: Send + 'static , E: Send + 'static {
     /// If there's one or more tasks with error, the promise fails and returns a vector with all the Results.
     ///
     /// ```rust
-    /// use asynchronous::Deferred;
-    /// use asynchronous::ControlFlow;
+    /// use asynchronous::{Deferred, ControlFlow};
     /// 
     /// let mut vec_deferred = Vec::new();
     /// for i in 0..5 { vec_deferred.push(Deferred::<_,&str>::new(move || Ok(i) )) }
@@ -205,21 +204,49 @@ impl<T,E> Deferred<T,E> where T: Send + 'static , E: Send + 'static {
     /// ```     
     pub fn vec_to_promise(vector:Vec<Deferred<T,E>>, control: ControlFlow) -> Promise<Vec<T>,Vec<Result<T,E>>> {
         match control {
-            ControlFlow::Series => Deferred::process_series(vector),
-            ControlFlow::Parallel => Deferred::process_parallel(vector, 0),
-            ControlFlow::ParallelLimit(limit) => Deferred::process_parallel(vector, limit),
-            ControlFlow::ParallelCPUS => Deferred::process_parallel(vector, num_cpus::get())
+            ControlFlow::Series => Deferred::process_series(vector, 0),
+            ControlFlow::Parallel => Deferred::process_parallel(vector, 0, 0, true),
+            ControlFlow::ParallelLimit(limit) => Deferred::process_parallel(vector, limit, 0, true),
+            ControlFlow::ParallelCPUS => Deferred::process_parallel(vector, num_cpus::get(), 0, true)
         }
     } 
 
-    fn process_series(vector:Vec<Deferred<T,E>>) -> Promise<Vec<T>,Vec<Result<T,E>>> {
+    /// Executes a vector of tasks and returns a Promise with a vector of the first **num_first** tasks that return Ok.
+    /// If the **wait** parameter is **true**, the promise waits for all tasks that are running at that moment.
+    /// If it's **false**, the promise returns once reaches the **num_first** tasks with Ok.
+    /// If it's not possible achieve this number, the promise fails and returns a vector with all the Results.
+    ///
+    /// ```rust
+    /// use asynchronous::{Deferred, ControlFlow};    
+    /// 
+    /// let mut v = vec![];
+    /// for i in 0..20 { v.push(Deferred::<u32, ()>::new(move ||{ Ok(i) })); }
+    /// // The first 5 tasks that ended with Ok
+    /// let _ = Deferred::first_to_promise(5, false, v, ControlFlow::ParallelLimit(3))   
+    /// .finally_sync(|res| {           
+    ///    assert_eq!(res.len(), 5);                
+    /// }, |_| { });
+    /// ```     
+    pub fn first_to_promise(num_first:usize, wait:bool, vector:Vec<Deferred<T,E>>, control: ControlFlow) -> Promise<Vec<T>,Vec<Result<T,E>>> {
+        match control {
+            ControlFlow::Series => Deferred::process_series(vector, num_first),
+            ControlFlow::Parallel => Deferred::process_parallel(vector, 0, num_first, wait),
+            ControlFlow::ParallelLimit(limit) => Deferred::process_parallel(vector, limit, num_first, wait),
+            ControlFlow::ParallelCPUS => Deferred::process_parallel(vector, num_cpus::get(), num_first, wait)
+        }
+    }
+
+    fn process_series(vector:Vec<Deferred<T,E>>, num_first:usize) -> Promise<Vec<T>,Vec<Result<T,E>>> {
         let (tx,rx) = mpsc::channel();
         thread::spawn(move || {
             let mut results:Vec<T> = Vec::new();                            
             for defer in vector {
                 defer.unlock();
                 match defer.receiver.recv().unwrap() {
-                    Ok(t) => results.push(t),
+                    Ok(t) => {
+                        results.push(t);
+                        if num_first > 0 && results.len() >= num_first { break }
+                    },
                     Err(e) => {
                         let mut results_error:Vec<Result<T,E>> = Vec::new();
                         for t in results { results_error.push(Ok(t)) }
@@ -236,9 +263,10 @@ impl<T,E> Deferred<T,E> where T: Send + 'static , E: Send + 'static {
         Promise::<Vec<T>, Vec<Result<T,E>>> { receiver: rx }           
     }
 
-    fn process_parallel(vector:Vec<Deferred<T,E>>, limit:usize) -> Promise<Vec<T>,Vec<Result<T,E>>> {
+    fn process_parallel(vector:Vec<Deferred<T,E>>, limit:usize, num_first:usize, wait:bool) -> Promise<Vec<T>,Vec<Result<T,E>>> {
         let (tx,rx) = mpsc::channel();
         thread::spawn(move || {
+            let mut num_results_received = 0;
             let mut results:Vec<Option<Result<T,E>>> = vec![];
             for _ in 0..vector.len() { results.push(None); }
             let mut it = vector.into_iter();                    
@@ -246,41 +274,57 @@ impl<T,E> Deferred<T,E> where T: Send + 'static , E: Send + 'static {
             let mut id_process = 0;
             let mut active_process = 0;
             let mut is_error = false;
-            loop {
+            loop {                
                 if active_process > 0 {
-                    let finished:(usize,Result<T,E>) = rxinter.recv().unwrap();
-                    if finished.1.is_err() { is_error = true }
-                    results[finished.0] = Some(finished.1);
-                    active_process -= 1;
-                }
-
+                    match rxinter.recv() {
+                        Ok(r) => {
+                            let finished:(usize,Result<T,E>) = r;
+                            if finished.1.is_err() { is_error = true } else { num_results_received += 1 }
+                            results[finished.0] = Some(finished.1);                            
+                            active_process -= 1;        
+                        },
+                        Err(_) => break,
+                    }                   
+                } 
+                if !wait && num_first > 0 && num_results_received >= num_first { break }               
                 loop {
+                    if num_first > 0 && num_results_received >= num_first { break }
                     match it.next() {
-                        Some(defer) => {
+                        Some(defer) => {                                                        
                             active_process += 1;
                             defer.unlock();
                             let txinter_cloned = txinter.clone();
                             thread::spawn(move || {
-                                let info_send = (id_process, defer.receiver.recv().unwrap());
-                                txinter_cloned.send(info_send).unwrap()
+                                match defer.receiver.recv() {
+                                    Ok(r) => { &txinter_cloned.send((id_process, r)); } ,                                    
+                                    Err(_) => (),
+                                }
+                                
                             });
                             id_process += 1;
                         },
                         None => break
-                    }
-                    if limit!=0 && active_process >= limit { break }
+                    }                    
+                    if limit > 0 && active_process >= limit { break }
                 }
                 if active_process == 0 { break }
-            }                                      
+            }                   
+            if num_first > 0 && num_results_received >= num_first { is_error = false }
             let ok_results:Result<Vec<T>, Vec<Result<T,E>>> = match is_error {
                 false => {
                     let mut v:Vec<T> = Vec::new();
-                    for r in results { v.push(match r.unwrap() { Ok(t) => t, Err(_) => unreachable!() })}
+                    for r in results { 
+                        if r.is_none() { continue }
+                        v.push(match r.unwrap() { Ok(t) => t, Err(_) => continue })
+                    }
                     Ok(v)
                 },
                 true  => {
                     let mut v:Vec<Result<T,E>> = Vec::new();
-                    for r in results { v.push(r.unwrap()) }
+                    for r in results { 
+                        if r.is_none() { continue }
+                        v.push(r.unwrap()) 
+                    }
                     Err(v)
                 }
             };
@@ -1095,6 +1139,136 @@ mod test {
     }
 
     #[test]
+    fn deferred_first_wait() {
+        let mut v = vec![];
+        for i in 0..20 {
+            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
+        }
+        let _ = Deferred::first_to_promise(2, true, v, ControlFlow::Series)
+            .finally_sync(|res| {                               
+                assert_eq!(res.len(), 2);                
+            }, |err| {
+                unreachable!("{:?}", err);
+            });
+
+        let mut v = vec![];
+        for i in 0..20 {
+            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
+        }
+        let _ = Deferred::first_to_promise(5, true, v, ControlFlow::ParallelLimit(3))
+            .finally_sync(|res| {               
+                assert!(res.len()>=5 && res.len()<=7);                
+            }, |err| {
+                unreachable!("{:?}", err);
+            });
+
+        let mut v = vec![];
+        for i in 0..20 {
+            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
+        }
+        let _ = Deferred::first_to_promise(5, true, v, ControlFlow::Parallel)
+            .finally_sync(|res| {               
+                assert_eq!(res.len(), 20);                
+            }, |err| {
+                unreachable!("{:?}", err);
+            });
+
+        let mut v = vec![];
+        for i in 0..5 {
+            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
+        }
+        v.push(Deferred::<u32, &str>::new(move ||{ Err("Error in the middle") }));
+        for i in 6..20 {
+            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
+        }
+        let _ = Deferred::first_to_promise(10, true, v, ControlFlow::Parallel)
+            .finally_sync(|res| {                                           
+                assert_eq!(res.len(), 19);                   
+            }, |err| {
+                unreachable!("{:?}", err);                             
+            });  
+
+        let mut v = vec![];
+        for i in 0..5 {
+            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
+        }
+        for _ in 5..10 {
+            v.push(Deferred::<u32, &str>::new(move ||{ Err("Error") }));
+        }
+        let _ = Deferred::first_to_promise(7, true, v, ControlFlow::ParallelLimit(3))
+            .finally_sync(|res| {                                           
+                unreachable!("{:?}", res);                                                              
+            }, |err| {
+                assert_eq!(err.len(), 10);  
+            });  
+    }                
+
+    #[test]
+    fn deferred_first_no_wait() {
+        let mut v = vec![];
+        for i in 0..20 {
+            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
+        }
+        let _ = Deferred::first_to_promise(2, false, v, ControlFlow::Series)
+            .finally_sync(|res| {                               
+                assert_eq!(res.len(), 2);                
+            }, |err| {
+                unreachable!("{:?}", err);
+            });
+
+        let mut v = vec![];
+        for i in 0..20 {
+            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
+        }
+        let _ = Deferred::first_to_promise(5, false, v, ControlFlow::ParallelLimit(3))
+            .finally_sync(|res| {               
+                assert_eq!(res.len(), 5);                
+            }, |err| {
+                unreachable!("{:?}", err);
+            });
+
+        let mut v = vec![];
+        for i in 0..20 {
+            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
+        }
+        let _ = Deferred::first_to_promise(5, false, v, ControlFlow::Parallel)
+            .finally_sync(|res| {               
+                assert_eq!(res.len(), 5);                
+            }, |err| {
+                unreachable!("{:?}", err);
+            });
+
+        let mut v = vec![];
+        for i in 0..5 {
+            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
+        }
+        v.push(Deferred::<u32, &str>::new(move ||{ Err("Error in the middle") }));
+        for i in 6..20 {
+            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
+        }
+        let _ = Deferred::first_to_promise(10, false, v, ControlFlow::ParallelLimit(3))
+            .finally_sync(|res| {                                           
+                assert_eq!(res.len(), 10); 
+            }, |err| {
+                unreachable!("{:?}", err);                                               
+            }); 
+
+        let mut v = vec![];
+        for i in 0..5 {
+            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
+        }
+        for _ in 5..10 {
+            v.push(Deferred::<u32, &str>::new(move ||{ Err("Error") }));
+        }
+        let _ = Deferred::first_to_promise(7, false,  v, ControlFlow::ParallelLimit(3))
+            .finally_sync(|res| {                                           
+                unreachable!("{:?}", res);                                                              
+            }, |err| {
+                assert_eq!(err.len(), 10);  
+            }); 
+    }                    
+
+    #[test]
     fn deferred_chained() {
         let res = Deferred::<String, &str>::new(||{
             thread::sleep_ms(50);
@@ -1167,12 +1341,12 @@ mod test {
 
     #[test]
     fn event_loop_4() {
-        let event_loop = EventLoop::new().finish_in_ms(120);
+        let event_loop = EventLoop::new().finish_in_ms(450);
         assert_eq!(event_loop.emit("EventA"), Ok(()));        
         assert_eq!(event_loop.emit("EventB"), Ok(()));
         let x = Arc::new(Mutex::new(0));
         event_loop.emit_until(move || {
-            thread::sleep_ms(25);
+            thread::sleep_ms(100);
             let mut lock_x = x.lock().unwrap(); *lock_x += 1;
             if *lock_x == 2 { return Emit::Continue }
             if *lock_x <= 5 { Emit::Event("EventC") } else { Emit::Stop }

@@ -1,6 +1,6 @@
 extern crate asynchronous;
 
-use asynchronous::Promise;
+use asynchronous::{Promise, Deferred, ControlFlow};
 use std::thread;
 
 fn promise_mock(a:u32,b:u32) -> Promise<f64,String> {
@@ -16,6 +16,49 @@ fn promise_mock(a:u32,b:u32) -> Promise<f64,String> {
 fn main() {
 
 	println!("Starting Example!");
+
+    let mut v = vec![];
+    for i in 0..5 {
+        v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
+    }
+    v.push(Deferred::<u32, &str>::new(move ||{ Err("Error in the middle") }));
+    for i in 6..20 {
+        v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
+    }
+    let _ = Deferred::first_to_promise(7, false, v, ControlFlow::ParallelLimit(3))
+        .finally_sync(|res| {                                           
+        	println!("RES: {:?}", res);
+            assert_eq!(res.len(), 7);             
+        }, |err| {                               
+            unreachable!("{:?}", err);
+        });
+
+    let mut v = vec![];
+    for i in 0..20 {
+        v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
+    }
+    let _ = Deferred::first_to_promise(5, true, v, ControlFlow::ParallelLimit(3))
+        .finally_sync(|res| {           
+        	println!("Res: {:?}", res);    
+            assert!(res.len()>=5 && res.len()<=7);                
+        }, |err| {
+            unreachable!("{:?}", err);
+        });
+
+	let mut v = vec![];
+    for i in 0..20 {
+        v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
+    }
+    let _ = Deferred::first_to_promise(2, true, v, ControlFlow::Series)
+        .then(|res| {
+            println!("Res: {:?}", res);
+            assert_eq!(res.len(), 2);                
+            Ok(res)
+        }, |error| {
+        	println!("Error: {:?}", error);
+            Err("Error")
+        }).sync();
+
 	for _ in 0..5 {
 		let promiseA = Promise::new(|| {
 			println!("--> Starting Promise A");
