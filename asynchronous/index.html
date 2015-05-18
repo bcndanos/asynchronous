@@ -43,7 +43,7 @@
     <section id='main' class="content mod">
 <h1 class='fqn'><span class='in-band'>Crate <a class='mod' href=''>asynchronous</a></span><span class='out-of-band'><span id='render-detail'>
             <a id="toggle-all-docs" href="#" title="collapse all docs">[&minus;]</a>
-        </span><a id='src-0' class='srclink' href='../src/asynchronous/lib.rs.html#1-1437' title='goto source code'>[src]</a></span></h1>
+        </span><a id='src-0' class='srclink' href='../src/asynchronous/lib.rs.html#1-1527' title='goto source code'>[src]</a></span></h1>
 <div class='docblock'><p>A <strong>promise</strong> based asynchronous library</p>
 
 <p>This library provides an usefull way to invoke functions (clousures) in a <strong>Promise Style</strong> using separated threads. A Promise 
@@ -56,6 +56,16 @@ is a Struct that represents the return value or the error that the funcion produ
 <p><a href="https://github.com/bcndanos/asynchronous">Project github page</a></p>
 
 <p>This project is based on the <a href="https://github.com/kriskowal/q">Q Promise</a> library for Node JS and <a href="https://github.com/caolan/async">Async.js</a></p>
+
+<h1 id="license" class='section-header'><a
+                           href="#license">License</a></h1>
+<p>Dual-licensed to be compatible with the Rust project.</p>
+
+<p>Licensed under the Apache License, Version 2.0
+<a href="http://www.apache.org/licenses/LICENSE-2.0">http://www.apache.org/licenses/LICENSE-2.0</a> or the MIT license
+<a href="http://opensource.org/licenses/MIT">http://opensource.org/licenses/MIT</a>, at your
+option. This file may not be copied, modified, or distributed
+except according to those terms.</p>
 
 <h1 id="examples" class='section-header'><a
                            href="#examples">Examples</a></h1>
@@ -72,12 +82,9 @@ is a Struct that represents the return value or the error that the funcion produ
   <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='number'>10.0</span> <span class='op'>/</span> <span class='number'>3.0</span>);
   <span class='kw'>let</span> <span class='ident'>res_int</span> <span class='op'>=</span> <span class='ident'>res</span> <span class='kw'>as</span> <span class='ident'>u32</span> <span class='op'>*</span> <span class='number'>2</span>;
   <span class='prelude-val'>Ok</span>(<span class='ident'>res_int</span>)
-}).<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {       <span class='comment'>// res has type u32</span>
-  <span class='comment'>// Catch a correct result</span>
-  <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='number'>6u32</span>);
-}, <span class='op'>|</span><span class='ident'>error</span><span class='op'>|</span> {
-  <span class='comment'>// Catch an incorrect result</span>
-  <span class='macro'>unreachable</span><span class='macro'>!</span>();
+}).<span class='ident'>finally_sync_wrap</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {       <span class='comment'>// res has type Result&lt;u32,&amp;str&gt;</span>
+  <span class='comment'>// Executed always at the end</span>
+  <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>.<span class='ident'>unwrap</span>(), <span class='number'>6u32</span>);
 });
 </pre>
 

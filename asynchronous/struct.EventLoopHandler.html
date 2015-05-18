@@ -43,7 +43,7 @@
     <section id='main' class="content struct">
 <h1 class='fqn'><span class='in-band'>Struct <a href='index.html'>asynchronous</a>::<wbr><a class='struct' href=''>EventLoopHandler</a></span><span class='out-of-band'><span id='render-detail'>
             <a id="toggle-all-docs" href="#" title="collapse all docs">[&minus;]</a>
-        </span><a id='src-1520' class='srclink' href='../src/asynchronous/lib.rs.html#563-567' title='goto source code'>[src]</a></span></h1>
+        </span><a id='src-1632' class='srclink' href='../src/asynchronous/lib.rs.html#641-645' title='goto source code'>[src]</a></span></h1>
 <pre class='rust struct'>pub struct EventLoopHandler&lt;Ev&gt; {
     // some fields omitted
 }</pre><div class='docblock'><p>Event Loop wrapper that can be cloned to pass through threads</p>
@@ -69,9 +69,9 @@
 </pre>
 </div><h4 id='method.is_active' class='method'><code>fn <a href='#method.is_active' class='fnname'>is_active</a>(&amp;self) -&gt; <a href='http://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a></code></h4>
 <div class='docblock'><p>Returns true if the event loop is running</p>
-</div><h4 id='method.finish' class='method'><code>fn <a href='#method.finish' class='fnname'>finish</a>(self) -&gt; <a class='struct' href='../asynchronous/struct.EventLoopHandler.html' title='asynchronous::EventLoopHandler'>EventLoopHandler</a>&lt;Ev&gt;</code></h4>
+</div><h4 id='method.finish' class='method'><code>fn <a href='#method.finish' class='fnname'>finish</a>(&amp;self)</code></h4>
 <div class='docblock'><p>Finishes the event loop immediately.</p>
-</div><h4 id='method.finish_in_ms' class='method'><code>fn <a href='#method.finish_in_ms' class='fnname'>finish_in_ms</a>(self, duration_ms: <a href='http://doc.rust-lang.org/nightly/std/primitive.u32.html'>u32</a>) -&gt; <a class='struct' href='../asynchronous/struct.EventLoopHandler.html' title='asynchronous::EventLoopHandler'>EventLoopHandler</a>&lt;Ev&gt;</code></h4>
+</div><h4 id='method.finish_in_ms' class='method'><code>fn <a href='#method.finish_in_ms' class='fnname'>finish_in_ms</a>(&amp;self, duration_ms: <a href='http://doc.rust-lang.org/nightly/std/primitive.u32.html'>u32</a>)</code></h4>
 <div class='docblock'><p>Finishes the event loop in N milliseconds</p>
 </div></div><h2 id='implementations'>Trait Implementations</h2><h3 class='impl'><code>impl&lt;Ev&gt; <a class='trait' href='http://doc.rust-lang.org/nightly/core/clone/trait.Clone.html' title='core::clone::Clone'>Clone</a> for <a class='struct' href='../asynchronous/struct.EventLoopHandler.html' title='asynchronous::EventLoopHandler'>EventLoopHandler</a>&lt;Ev&gt;</code></h3><div class='impl-items'><h4 id='method.clone' class='method'><code>fn <a href='http://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone' class='fnname'>clone</a>(&amp;self) -&gt; <a class='struct' href='../asynchronous/struct.EventLoopHandler.html' title='asynchronous::EventLoopHandler'>EventLoopHandler</a>&lt;Ev&gt;</code></h4>
 <h4 id='method.clone_from' class='method'><code>fn <a href='http://doc.rust-lang.org/nightly/core/clone/trait.Clone.html#method.clone_from' class='fnname'>clone_from</a>(&amp;mut self, source: &amp;Self)</code></h4>

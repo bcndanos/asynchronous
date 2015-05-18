@@ -1477,6 +1477,96 @@
 <span id="1435">1435</span>
 <span id="1436">1436</span>
 <span id="1437">1437</span>
+<span id="1438">1438</span>
+<span id="1439">1439</span>
+<span id="1440">1440</span>
+<span id="1441">1441</span>
+<span id="1442">1442</span>
+<span id="1443">1443</span>
+<span id="1444">1444</span>
+<span id="1445">1445</span>
+<span id="1446">1446</span>
+<span id="1447">1447</span>
+<span id="1448">1448</span>
+<span id="1449">1449</span>
+<span id="1450">1450</span>
+<span id="1451">1451</span>
+<span id="1452">1452</span>
+<span id="1453">1453</span>
+<span id="1454">1454</span>
+<span id="1455">1455</span>
+<span id="1456">1456</span>
+<span id="1457">1457</span>
+<span id="1458">1458</span>
+<span id="1459">1459</span>
+<span id="1460">1460</span>
+<span id="1461">1461</span>
+<span id="1462">1462</span>
+<span id="1463">1463</span>
+<span id="1464">1464</span>
+<span id="1465">1465</span>
+<span id="1466">1466</span>
+<span id="1467">1467</span>
+<span id="1468">1468</span>
+<span id="1469">1469</span>
+<span id="1470">1470</span>
+<span id="1471">1471</span>
+<span id="1472">1472</span>
+<span id="1473">1473</span>
+<span id="1474">1474</span>
+<span id="1475">1475</span>
+<span id="1476">1476</span>
+<span id="1477">1477</span>
+<span id="1478">1478</span>
+<span id="1479">1479</span>
+<span id="1480">1480</span>
+<span id="1481">1481</span>
+<span id="1482">1482</span>
+<span id="1483">1483</span>
+<span id="1484">1484</span>
+<span id="1485">1485</span>
+<span id="1486">1486</span>
+<span id="1487">1487</span>
+<span id="1488">1488</span>
+<span id="1489">1489</span>
+<span id="1490">1490</span>
+<span id="1491">1491</span>
+<span id="1492">1492</span>
+<span id="1493">1493</span>
+<span id="1494">1494</span>
+<span id="1495">1495</span>
+<span id="1496">1496</span>
+<span id="1497">1497</span>
+<span id="1498">1498</span>
+<span id="1499">1499</span>
+<span id="1500">1500</span>
+<span id="1501">1501</span>
+<span id="1502">1502</span>
+<span id="1503">1503</span>
+<span id="1504">1504</span>
+<span id="1505">1505</span>
+<span id="1506">1506</span>
+<span id="1507">1507</span>
+<span id="1508">1508</span>
+<span id="1509">1509</span>
+<span id="1510">1510</span>
+<span id="1511">1511</span>
+<span id="1512">1512</span>
+<span id="1513">1513</span>
+<span id="1514">1514</span>
+<span id="1515">1515</span>
+<span id="1516">1516</span>
+<span id="1517">1517</span>
+<span id="1518">1518</span>
+<span id="1519">1519</span>
+<span id="1520">1520</span>
+<span id="1521">1521</span>
+<span id="1522">1522</span>
+<span id="1523">1523</span>
+<span id="1524">1524</span>
+<span id="1525">1525</span>
+<span id="1526">1526</span>
+<span id="1527">1527</span>
 </pre><pre class='rust '>
 <span class='doccomment'>/*!
 A **promise** based asynchronous library
@@ -1491,6 +1581,16 @@ It includes methods to manage Event Loops, where there are tasks that &quot;emit
 [Project github page](https://github.com/bcndanos/asynchronous)
 
 This project is based on the [Q Promise](https://github.com/kriskowal/q) library for Node JS and [Async.js](https://github.com/caolan/async)
+
+#License
+
+Dual-licensed to be compatible with the Rust project.
+
+Licensed under the Apache License, Version 2.0
+http://www.apache.org/licenses/LICENSE-2.0 or the MIT license
+http://opensource.org/licenses/MIT, at your
+option. This file may not be copied, modified, or distributed
+except according to those terms.
 
 # Examples
 
@@ -1508,12 +1608,9 @@ Promise::new(|| {
   assert_eq!(res, 10.0 / 3.0);
   let res_int = res as u32 * 2;
   Ok(res_int)
-}).finally_sync(|res| {       // res has type u32
-  // Catch a correct result
-  assert_eq!(res, 6u32);
-}, |error| {
-  // Catch an incorrect result
-  unreachable!();
+}).finally_sync_wrap(|res| {       // res has type Result&lt;u32,&amp;str&gt;
+  // Executed always at the end
+  assert_eq!(res.unwrap(), 6u32);
 });
 ``` 
 
@@ -1789,7 +1886,7 @@ el.to_promise().finally_sync(|res| {  // res: Vec&lt;Ev&gt;
                 }
                 <span class='kw'>if</span> <span class='ident'>active_process</span> <span class='op'>==</span> <span class='number'>0</span> { <span class='kw'>break</span> }
             }                   
-            <span class='kw'>if</span> <span class='ident'>num_first</span> <span class='op'>&gt;</span> <span class='number'>0</span> <span class='op'>&amp;&amp;</span> <span class='ident'>num_results_received</span> <span class='op'>&gt;=</span> <span class='ident'>num_first</span> { <span class='ident'>is_error</span> <span class='op'>=</span> <span class='boolval'>false</span> }
+            <span class='kw'>if</span> <span class='ident'>num_first</span> <span class='op'>&gt;</span> <span class='number'>0</span> { <span class='ident'>is_error</span> <span class='op'>=</span> <span class='ident'>num_results_received</span> <span class='op'>&lt;</span> <span class='ident'>num_first</span> }
             <span class='kw'>let</span> <span class='ident'>ok_results</span>:<span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>T</span><span class='op'>&gt;</span>, <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>T</span>,<span class='ident'>E</span><span class='op'>&gt;&gt;</span><span class='op'>&gt;</span> <span class='op'>=</span> <span class='kw'>match</span> <span class='ident'>is_error</span> {
                 <span class='boolval'>false</span> <span class='op'>=&gt;</span> {
                     <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>v</span>:<span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>T</span><span class='op'>&gt;</span> <span class='op'>=</span> <span class='ident'>Vec</span>::<span class='ident'>new</span>();
@@ -1975,6 +2072,8 @@ el.to_promise().finally_sync(|res| {  // res: Vec&lt;Ev&gt;
         <span class='ident'>Promise</span>::<span class='op'>&lt;</span><span class='ident'>T</span>,<span class='ident'>E</span><span class='op'>&gt;</span> { <span class='ident'>receiver</span>: <span class='ident'>rx</span> }
     }
 
+    
+
     <span class='doccomment'>/// Executes only one of the two functions received depending on the result of the previous promise (Ok or Err). </span>
     <span class='doccomment'>/// It doesn&#39;t return anything and it&#39;s completly asynchronous.</span>
     <span class='doccomment'>///</span>
@@ -2025,6 +2124,75 @@ el.to_promise().finally_sync(|res| {  // res: Vec&lt;Ev&gt;
             <span class='prelude-val'>Err</span>(<span class='ident'>e</span>) <span class='op'>=&gt;</span> <span class='ident'>fe</span>(<span class='ident'>e</span>)
         };
     }   
+
+    <span class='doccomment'>/// The same functionality as **then**, but wraps the result in only one function</span>
+    <span class='doccomment'>///</span>
+    <span class='doccomment'>/// ```rust</span>
+    <span class='doccomment'>/// let r = asynchronous::Promise::new(|| {</span>
+    <span class='doccomment'>///    if false { Ok(1.23) } else { Err(&quot;Final error&quot;)}</span>
+    <span class='doccomment'>/// }).then_wrap(|res| {</span>
+    <span class='doccomment'>///    // Do something that executes always even on error</span>
+    <span class='doccomment'>///    assert!(res.is_err());</span>
+    <span class='doccomment'>///    res</span>
+    <span class='doccomment'>/// }).then(|res| {</span>
+    <span class='doccomment'>///    unreachable!();</span>
+    <span class='doccomment'>///    assert_eq!(res, 1.23);</span>
+    <span class='doccomment'>///    Ok(34)</span>
+    <span class='doccomment'>/// }, |err| {</span>
+    <span class='doccomment'>///    assert_eq!(err, &quot;Final error&quot;);</span>
+    <span class='doccomment'>///    if true { Ok(35) } else { Err(44u64)}</span>
+    <span class='doccomment'>/// }).sync();</span>
+    <span class='doccomment'>/// assert_eq!(r, Ok(35));</span>
+    <span class='doccomment'>/// ```   </span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>then_wrap</span><span class='op'>&lt;</span><span class='ident'>TT</span>,<span class='ident'>EE</span>,<span class='ident'>F</span><span class='op'>&gt;</span>(<span class='self'>self</span>, <span class='ident'>f</span>:<span class='ident'>F</span>) <span class='op'>-&gt;</span> <span class='ident'>Promise</span><span class='op'>&lt;</span><span class='ident'>TT</span>,<span class='ident'>EE</span><span class='op'>&gt;</span> 
+        <span class='kw'>where</span> <span class='ident'>TT</span>: <span class='ident'>Send</span> <span class='op'>+</span> <span class='lifetime'>&#39;static</span>, <span class='ident'>EE</span>: <span class='ident'>Send</span> <span class='op'>+</span> <span class='lifetime'>&#39;static</span>,
+              <span class='ident'>F</span>: <span class='ident'>Send</span> <span class='op'>+</span> <span class='lifetime'>&#39;static</span> <span class='op'>+</span> <span class='ident'>FnOnce</span>(<span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>T</span>,<span class='ident'>E</span><span class='op'>&gt;</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>TT</span>,<span class='ident'>EE</span><span class='op'>&gt;</span> {
+        <span class='kw'>let</span> (<span class='ident'>tx</span>,<span class='ident'>rx</span>) <span class='op'>=</span> <span class='ident'>mpsc</span>::<span class='ident'>channel</span>();
+        <span class='ident'>thread</span>::<span class='ident'>spawn</span>(<span class='kw'>move</span> <span class='op'>||</span> { 
+            <span class='kw'>let</span> <span class='ident'>res</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>receiver</span>.<span class='ident'>recv</span>().<span class='ident'>unwrap</span>();
+            <span class='ident'>tx</span>.<span class='ident'>send</span>(<span class='ident'>f</span>(<span class='ident'>res</span>))
+        });
+        <span class='ident'>Promise</span>::<span class='op'>&lt;</span><span class='ident'>TT</span>,<span class='ident'>EE</span><span class='op'>&gt;</span> { <span class='ident'>receiver</span>: <span class='ident'>rx</span> }
+    }
+
+    <span class='doccomment'>/// The same functionality as **finally**, but wraps the result in only one function</span>
+    <span class='doccomment'>///</span>
+    <span class='doccomment'>/// ```rust</span>
+    <span class='doccomment'>/// asynchronous::Promise::new(|| {</span>
+    <span class='doccomment'>///    std::thread::sleep_ms(100);</span>
+    <span class='doccomment'>///    if true { Ok(32) } else { Err(&quot;Error txt&quot;) }</span>
+    <span class='doccomment'>/// }).finally_wrap(|res| { </span>
+    <span class='doccomment'>///    // Executed always at the end.</span>
+    <span class='doccomment'>///    assert_eq!(res.unwrap(), 32);</span>
+    <span class='doccomment'>/// });</span>
+    <span class='doccomment'>///</span>
+    <span class='doccomment'>/// let a = 2 + 3;  // This line is executed before the above Promise</span>
+    <span class='doccomment'>/// </span>
+    <span class='doccomment'>/// ``` </span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>finally_wrap</span><span class='op'>&lt;</span><span class='ident'>F</span><span class='op'>&gt;</span>(<span class='self'>self</span>, <span class='ident'>f</span>:<span class='ident'>F</span>) <span class='kw'>where</span> <span class='ident'>F</span>: <span class='ident'>Send</span> <span class='op'>+</span> <span class='lifetime'>&#39;static</span> <span class='op'>+</span> <span class='ident'>FnOnce</span>(<span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>T</span>,<span class='ident'>E</span><span class='op'>&gt;</span>) {
+        <span class='ident'>thread</span>::<span class='ident'>spawn</span>(<span class='kw'>move</span> <span class='op'>||</span> {
+            <span class='ident'>f</span>(<span class='self'>self</span>.<span class='ident'>receiver</span>.<span class='ident'>recv</span>().<span class='ident'>unwrap</span>());
+        });
+    }
+
+    <span class='doccomment'>/// The same functionality as **finally_sync**, but wraps the result in only one function</span>
+    <span class='doccomment'>///</span>
+    <span class='doccomment'>/// ```rust</span>
+    <span class='doccomment'>/// asynchronous::Promise::new(|| {</span>
+    <span class='doccomment'>///    std::thread::sleep_ms(100);</span>
+    <span class='doccomment'>///    if true { Ok(32) } else { Err(&quot;Error txt&quot;) }</span>
+    <span class='doccomment'>/// }).finally_sync_wrap(|res| { </span>
+    <span class='doccomment'>///    // Executed always at the end.</span>
+    <span class='doccomment'>///    assert_eq!(res.unwrap(), 32);</span>
+    <span class='doccomment'>/// });</span>
+    <span class='doccomment'>///</span>
+    <span class='doccomment'>/// let a = 2 + 3;  // This line is executed after the above Promise</span>
+    <span class='doccomment'>/// </span>
+    <span class='doccomment'>/// ``` </span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>finally_sync_wrap</span><span class='op'>&lt;</span><span class='ident'>F</span><span class='op'>&gt;</span>(<span class='self'>self</span>, <span class='ident'>f</span>:<span class='ident'>F</span>) <span class='kw'>where</span> <span class='ident'>F</span>: <span class='ident'>Send</span> <span class='op'>+</span> <span class='lifetime'>&#39;static</span> <span class='op'>+</span> <span class='ident'>FnOnce</span>(<span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>T</span>,<span class='ident'>E</span><span class='op'>&gt;</span>) {
+        <span class='ident'>f</span>(<span class='self'>self</span>.<span class='ident'>sync</span>());
+    }    
+
 }
 
 <span class='comment'>// Event Loops //</span>
@@ -2110,27 +2278,21 @@ el.to_promise().finally_sync(|res| {  // res: Vec&lt;Ev&gt;
     }     
 
     <span class='doccomment'>/// Finishes the event loop immediately.</span>
-    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>finish</span>(<span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='ident'>EventLoopHandler</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> { 
-        {
-            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>lock_finished</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>finished</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>();
-            <span class='kw'>if</span> <span class='op'>!</span><span class='op'>*</span><span class='ident'>lock_finished</span> {
-               <span class='op'>*</span><span class='ident'>lock_finished</span> <span class='op'>=</span> <span class='boolval'>true</span>;
-               <span class='kw'>let</span> _ <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>tx</span>.<span class='ident'>send</span>(<span class='prelude-val'>None</span>);
-            }
-        }
-        <span class='self'>self</span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>finish</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>) {         
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>lock_finished</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>finished</span>.<span class='ident'>lock</span>().<span class='ident'>unwrap</span>();
+        <span class='kw'>if</span> <span class='op'>!</span><span class='op'>*</span><span class='ident'>lock_finished</span> {
+           <span class='op'>*</span><span class='ident'>lock_finished</span> <span class='op'>=</span> <span class='boolval'>true</span>;
+           <span class='kw'>let</span> _ <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>tx</span>.<span class='ident'>send</span>(<span class='prelude-val'>None</span>);
+        }        
     }
 
     <span class='doccomment'>/// Finishes the event loop in N milliseconds</span>
-    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>finish_in_ms</span>(<span class='self'>self</span>, <span class='ident'>duration_ms</span>:<span class='ident'>u32</span>) <span class='op'>-&gt;</span> <span class='ident'>EventLoopHandler</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> {
-        {
-            <span class='kw'>let</span> <span class='ident'>handler</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>clone</span>();
-            <span class='ident'>thread</span>::<span class='ident'>spawn</span>(<span class='kw'>move</span><span class='op'>||</span> {
-                <span class='ident'>thread</span>::<span class='ident'>sleep_ms</span>(<span class='ident'>duration_ms</span>);    
-                <span class='kw'>let</span> _ <span class='op'>=</span> <span class='ident'>handler</span>.<span class='ident'>finish</span>();            
-            });
-        }
-        <span class='self'>self</span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>finish_in_ms</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>, <span class='ident'>duration_ms</span>:<span class='ident'>u32</span>) {
+        <span class='kw'>let</span> <span class='ident'>handler</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>clone</span>();
+        <span class='ident'>thread</span>::<span class='ident'>spawn</span>(<span class='kw'>move</span><span class='op'>||</span> {
+            <span class='ident'>thread</span>::<span class='ident'>sleep_ms</span>(<span class='ident'>duration_ms</span>);    
+            <span class='kw'>let</span> _ <span class='op'>=</span> <span class='ident'>handler</span>.<span class='ident'>finish</span>();            
+        });
     }            
 
 }
@@ -2325,18 +2487,14 @@ el.to_promise().finally_sync(|res| {  // res: Vec&lt;Ev&gt;
 
     <span class='doccomment'>/// Finishes the event loop immediately.</span>
     <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>finish</span>(<span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='ident'>EventLoop</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> { 
-        <span class='ident'>EventLoop</span> {
-            <span class='ident'>receiver</span> : <span class='self'>self</span>.<span class='ident'>receiver</span>,
-            <span class='ident'>handler</span>  : <span class='self'>self</span>.<span class='ident'>handler</span>.<span class='ident'>finish</span>(),
-        }
+        <span class='self'>self</span>.<span class='ident'>handler</span>.<span class='ident'>finish</span>();
+        <span class='self'>self</span>
     }
 
     <span class='doccomment'>/// Finishes the event loop in N milliseconds</span>
     <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>finish_in_ms</span>(<span class='self'>self</span>, <span class='ident'>duration_ms</span>:<span class='ident'>u32</span>) <span class='op'>-&gt;</span> <span class='ident'>EventLoop</span><span class='op'>&lt;</span><span class='ident'>Ev</span><span class='op'>&gt;</span> {
-        <span class='ident'>EventLoop</span> {
-            <span class='ident'>receiver</span> : <span class='self'>self</span>.<span class='ident'>receiver</span>,
-            <span class='ident'>handler</span>  : <span class='self'>self</span>.<span class='ident'>handler</span>.<span class='ident'>finish_in_ms</span>(<span class='ident'>duration_ms</span>),
-        }
+        <span class='self'>self</span>.<span class='ident'>handler</span>.<span class='ident'>finish_in_ms</span>(<span class='ident'>duration_ms</span>);
+        <span class='self'>self</span>
     }        
 
     <span class='doccomment'>/// Returns true if the event loop is running</span>
@@ -2681,6 +2839,17 @@ el.to_promise().finally_sync(|res| {  // res: Vec&lt;Ev&gt;
             }, <span class='op'>|</span><span class='ident'>err</span><span class='op'>|</span> {
                 <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>err</span>.<span class='ident'>len</span>(), <span class='number'>10</span>);  
             });  
+
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>v</span> <span class='op'>=</span> <span class='macro'>vec</span><span class='macro'>!</span>[];
+        <span class='kw'>for</span> <span class='ident'>i</span> <span class='kw'>in</span> <span class='number'>0</span>..<span class='number'>5</span> {
+            <span class='ident'>v</span>.<span class='ident'>push</span>(<span class='ident'>Deferred</span>::<span class='op'>&lt;</span><span class='ident'>u32</span>, <span class='kw-2'>&amp;</span><span class='ident'>str</span><span class='op'>&gt;</span>::<span class='ident'>new</span>(<span class='kw'>move</span> <span class='op'>||</span>{ <span class='prelude-val'>Ok</span>(<span class='ident'>i</span>) }));
+        }
+        <span class='kw'>let</span> _ <span class='op'>=</span> <span class='ident'>Deferred</span>::<span class='ident'>first_to_promise</span>(<span class='number'>7</span>, <span class='boolval'>true</span>, <span class='ident'>v</span>, <span class='ident'>ControlFlow</span>::<span class='ident'>ParallelLimit</span>(<span class='number'>3</span>))
+            .<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {                                           
+                <span class='macro'>unreachable</span><span class='macro'>!</span>(<span class='string'>&quot;{:?}&quot;</span>, <span class='ident'>res</span>);                                                              
+            }, <span class='op'>|</span><span class='ident'>err</span><span class='op'>|</span> {
+                <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>err</span>.<span class='ident'>len</span>(), <span class='number'>5</span>);  
+            });              
     }                
 
     <span class='attribute'>#[<span class='ident'>test</span>]</span>
@@ -2746,6 +2915,17 @@ el.to_promise().finally_sync(|res| {  // res: Vec&lt;Ev&gt;
             }, <span class='op'>|</span><span class='ident'>err</span><span class='op'>|</span> {
                 <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>err</span>.<span class='ident'>len</span>(), <span class='number'>10</span>);  
             }); 
+
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>v</span> <span class='op'>=</span> <span class='macro'>vec</span><span class='macro'>!</span>[];
+        <span class='kw'>for</span> <span class='ident'>i</span> <span class='kw'>in</span> <span class='number'>0</span>..<span class='number'>5</span> {
+            <span class='ident'>v</span>.<span class='ident'>push</span>(<span class='ident'>Deferred</span>::<span class='op'>&lt;</span><span class='ident'>u32</span>, <span class='kw-2'>&amp;</span><span class='ident'>str</span><span class='op'>&gt;</span>::<span class='ident'>new</span>(<span class='kw'>move</span> <span class='op'>||</span>{ <span class='prelude-val'>Ok</span>(<span class='ident'>i</span>) }));
+        }
+        <span class='kw'>let</span> _ <span class='op'>=</span> <span class='ident'>Deferred</span>::<span class='ident'>first_to_promise</span>(<span class='number'>7</span>, <span class='boolval'>false</span>, <span class='ident'>v</span>, <span class='ident'>ControlFlow</span>::<span class='ident'>ParallelLimit</span>(<span class='number'>3</span>))
+            .<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {                                           
+                <span class='macro'>unreachable</span><span class='macro'>!</span>(<span class='string'>&quot;{:?}&quot;</span>, <span class='ident'>res</span>);                                                              
+            }, <span class='op'>|</span><span class='ident'>err</span><span class='op'>|</span> {
+                <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>err</span>.<span class='ident'>len</span>(), <span class='number'>5</span>);  
+            });                          
     }                    
 
     <span class='attribute'>#[<span class='ident'>test</span>]</span>
