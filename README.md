@@ -22,6 +22,16 @@ It includes methods to manage Event Loops, where there are tasks that "emit" eve
 
 This project is based on the [Q Promise](https://github.com/kriskowal/q) library for Node JS and [Async.js](https://github.com/caolan/async)
 
+#License
+
+Dual-licensed to be compatible with the Rust project.
+
+Licensed under the Apache License, Version 2.0
+http://www.apache.org/licenses/LICENSE-2.0 or the MIT license
+http://opensource.org/licenses/MIT, at your
+option. This file may not be copied, modified, or distributed
+except according to those terms.
+
 # Examples
 
 This is a simple setup for a promise based execution:

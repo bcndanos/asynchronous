@@ -1,24 +1,23 @@
 [package]
 name = "asynchronous"
-version = "0.4.3"
+version = "0.4.4"
 authors = ["bcndanos <rinnegatobcn@gmail.com>"]
 description = "Promises Q style , async and event loops"
 repository = "https://github.com/bcndanos/asynchronous"
 documentation = "http://bcndanos.github.io/asynchronous/asynchronous/"
 readme = "README.md"
-license = "GPL-3.0"
+license = "Apache-2.0 / MIT"
 
 [dependencies]
 num_cpus = "0.2.5"
 
-[[example]]
-name = "basic"
-path = "examples/basic.rs"
-test = false
-bench = false
+[dev-dependencies]
+rustc-serialize = "0.3.14"
+docopt = "0.6.64"
+ansi_term = "0.5.2"
 
 [[example]]
-name = "event_loop"
-path = "examples/event_loop.rs"
+name = "prime_numbers"
+path = "examples/prime_numbers.rs"
 test = false
 bench = false

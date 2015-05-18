@@ -12,6 +12,16 @@ It includes methods to manage Event Loops, where there are tasks that "emit" eve
 
 This project is based on the [Q Promise](https://github.com/kriskowal/q) library for Node JS and [Async.js](https://github.com/caolan/async)
 
+#License
+
+Dual-licensed to be compatible with the Rust project.
+
+Licensed under the Apache License, Version 2.0
+http://www.apache.org/licenses/LICENSE-2.0 or the MIT license
+http://opensource.org/licenses/MIT, at your
+option. This file may not be copied, modified, or distributed
+except according to those terms.
+
 # Examples
 
 This is a simple setup for a promise based execution:
@@ -28,12 +38,9 @@ Promise::new(|| {
   assert_eq!(res, 10.0 / 3.0);
   let res_int = res as u32 * 2;
   Ok(res_int)
-}).finally_sync(|res| {       // res has type u32
-  // Catch a correct result
-  assert_eq!(res, 6u32);
-}, |error| {
-  // Catch an incorrect result
-  unreachable!();
+}).finally_sync_wrap(|res| {       // res has type Result<u32,&str>
+  // Executed always at the end
+  assert_eq!(res.unwrap(), 6u32);
 });
 ``` 
 
@@ -495,6 +502,8 @@ impl<T,E> Promise<T,E> where T: Send + 'static , E: Send + 'static {
         Promise::<T,E> { receiver: rx }
     }
 
+    
+
     /// Executes only one of the two functions received depending on the result of the previous promise (Ok or Err). 
     /// It doesn't return anything and it's completly asynchronous.
     ///
@@ -545,6 +554,75 @@ impl<T,E> Promise<T,E> where T: Send + 'static , E: Send + 'static {
             Err(e) => fe(e)
         };
     }   
+
+    /// The same functionality as **then**, but wraps the result in only one function
+    ///
+    /// ```rust
+    /// let r = asynchronous::Promise::new(|| {
+    ///    if false { Ok(1.23) } else { Err("Final error")}
+    /// }).then_wrap(|res| {
+    ///    // Do something that executes always even on error
+    ///    assert!(res.is_err());
+    ///    res
+    /// }).then(|res| {
+    ///    unreachable!();
+    ///    assert_eq!(res, 1.23);
+    ///    Ok(34)
+    /// }, |err| {
+    ///    assert_eq!(err, "Final error");
+    ///    if true { Ok(35) } else { Err(44u64)}
+    /// }).sync();
+    /// assert_eq!(r, Ok(35));
+    /// ```   
+    pub fn then_wrap<TT,EE,F>(self, f:F) -> Promise<TT,EE> 
+        where TT: Send + 'static, EE: Send + 'static,
+              F: Send + 'static + FnOnce(Result<T,E>) -> Result<TT,EE> {
+        let (tx,rx) = mpsc::channel();
+        thread::spawn(move || { 
+            let res = self.receiver.recv().unwrap();
+            tx.send(f(res))
+        });
+        Promise::<TT,EE> { receiver: rx }
+    }
+
+    /// The same functionality as **finally**, but wraps the result in only one function
+    ///
+    /// ```rust
+    /// asynchronous::Promise::new(|| {
+    ///    std::thread::sleep_ms(100);
+    ///    if true { Ok(32) } else { Err("Error txt") }
+    /// }).finally_wrap(|res| { 
+    ///    // Executed always at the end.
+    ///    assert_eq!(res.unwrap(), 32);
+    /// });
+    ///
+    /// let a = 2 + 3;  // This line is executed before the above Promise
+    /// 
+    /// ``` 
+    pub fn finally_wrap<F>(self, f:F) where F: Send + 'static + FnOnce(Result<T,E>) {
+        thread::spawn(move || {
+            f(self.receiver.recv().unwrap());
+        });
+    }
+
+    /// The same functionality as **finally_sync**, but wraps the result in only one function
+    ///
+    /// ```rust
+    /// asynchronous::Promise::new(|| {
+    ///    std::thread::sleep_ms(100);
+    ///    if true { Ok(32) } else { Err("Error txt") }
+    /// }).finally_sync_wrap(|res| { 
+    ///    // Executed always at the end.
+    ///    assert_eq!(res.unwrap(), 32);
+    /// });
+    ///
+    /// let a = 2 + 3;  // This line is executed after the above Promise
+    /// 
+    /// ``` 
+    pub fn finally_sync_wrap<F>(self, f:F) where F: Send + 'static + FnOnce(Result<T,E>) {
+        f(self.sync());
+    }    
+
 }
 
 // Event Loops //
@@ -630,27 +708,21 @@ impl<Ev> EventLoopHandler<Ev>  where Ev: Send + 'static {
     }     
 
     /// Finishes the event loop immediately.
-    pub fn finish(self) -> EventLoopHandler<Ev> { 
-        {
-            let mut lock_finished = self.finished.lock().unwrap();
-            if !*lock_finished {
-               *lock_finished = true;
-               let _ = self.tx.send(None);
-            }
-        }
-        self
+    pub fn finish(&self) {         
+        let mut lock_finished = self.finished.lock().unwrap();
+        if !*lock_finished {
+           *lock_finished = true;
+           let _ = self.tx.send(None);
+        }        
     }
 
     /// Finishes the event loop in N milliseconds
-    pub fn finish_in_ms(self, duration_ms:u32) -> EventLoopHandler<Ev> {
-        {
-            let handler = self.clone();
-            thread::spawn(move|| {
-                thread::sleep_ms(duration_ms);    
-                let _ = handler.finish();            
-            });
-        }
-        self
+    pub fn finish_in_ms(&self, duration_ms:u32) {
+        let handler = self.clone();
+        thread::spawn(move|| {
+            thread::sleep_ms(duration_ms);    
+            let _ = handler.finish();            
+        });
     }            
 
 }
@@ -845,18 +917,14 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
 
     /// Finishes the event loop immediately.
     pub fn finish(self) -> EventLoop<Ev> { 
-        EventLoop {
-            receiver : self.receiver,
-            handler  : self.handler.finish(),
-        }
+        self.handler.finish();
+        self
     }
 
     /// Finishes the event loop in N milliseconds
     pub fn finish_in_ms(self, duration_ms:u32) -> EventLoop<Ev> {
-        EventLoop {
-            receiver : self.receiver,
-            handler  : self.handler.finish_in_ms(duration_ms),
-        }
+        self.handler.finish_in_ms(duration_ms);
+        self
     }        
 
     /// Returns true if the event loop is running
