@@ -38,7 +38,7 @@ Promise::new(|| {
   assert_eq!(res, 10.0 / 3.0);
   let res_int = res as u32 * 2;
   Ok(res_int)
-}).finally_sync_wrap(|res| {       // res has type Result<u32,&str>
+}).chain_finally_sync(|res| {       // res has type Result<u32,&str>
   // Executed always at the end
   assert_eq!(res.unwrap(), 6u32);
 });
@@ -99,8 +99,10 @@ el.to_promise().finally_sync(|res| {  // res: Vec<Ev>
 ``` 
 
 */
+#![feature(core)]
 extern crate num_cpus;
 
+use std::boxed::FnBox;
 use std::thread;
 use std::sync::{mpsc, Arc, Mutex, Condvar};
 
@@ -119,10 +121,10 @@ pub enum ControlFlow {
 /// Stores a function and delays its execution until it's transform to a promise.
 /// T : Type of value returned
 /// E : Type of error returned
-pub struct Deferred<T,E> {
-    starter  : Arc<(Mutex<bool>, Condvar)>,
-    receiver : mpsc::Receiver<Result<T,E>>
+pub struct Deferred<T,E>  {    
+    f   : Box<FnBox() -> Result<T,E> + Send + 'static>,        
 }
+
 
 impl<T,E> Deferred<T,E> where T: Send + 'static , E: Send + 'static {
     /// Create a new task in deferred.
@@ -134,52 +136,135 @@ impl<T,E> Deferred<T,E> where T: Send + 'static , E: Send + 'static {
     /// });
     /// // At this point "deferred" is not executed
     /// ```         
-    pub fn new<F>(f:F) -> Deferred<T,E> where F: Send + 'static + FnOnce() -> Result<T,E> {
-        let (tx,rx) = mpsc::channel();
-        let pair = Arc::new((Mutex::new(false), Condvar::new()));
-        let pair_c = pair.clone();
-        thread::spawn(move|| {
-            // wait for the thread to start up
-            let &(ref lock, ref cvar) = &*pair_c;
-            let mut started = lock.lock().unwrap();    
-            while !*started {  started = cvar.wait(started).unwrap(); }            
-            tx.send(f())
-        });
-        Deferred {
-            starter  : pair,
-            receiver : rx
+    pub fn new<F>(f:F) -> Deferred<T,E> 
+        where F: Send + 'static + FnOnce() -> Result<T,E> {
+        Deferred { f : Box::new(f) }
+    } 
+
+    /// Syncronizes the execution with the caller, and returns its value.
+    ///
+    /// ```rust
+    /// use asynchronous::Deferred;
+    /// 
+    /// let deferred_a = Deferred::<_,&str>::new(|| {
+    ///    // Do something  
+    ///    Ok("value a")
+    /// });
+    /// let deferred_b = Deferred::<_,&str>::new(|| {    
+    ///    // Do something 
+    ///    Ok("value b")
+    /// });
+    /// // Do something
+    /// assert_eq!(deferred_a.sync(), Ok("value a"));
+    /// assert_eq!(deferred_b.sync(), Ok("value b"));
+    /// ``` 
+    pub fn sync(self) -> Result<T,E> {        
+        self.to_promise().sync()
+    }
+
+    /// Executes only one of the two functions received depending on the result of the previous task deferred (Ok or Err). 
+    /// Returns a new Deferred
+    ///
+    /// ```rust
+    /// let r = asynchronous::Deferred::new(|| {
+    ///    if false { Ok(1.23) } else { Err("Final error")}
+    /// }).then(|res| {
+    ///    unreachable!();
+    ///    assert_eq!(res, 1.23);
+    ///    Ok(34)
+    /// }, |err| {
+    ///    assert_eq!(err, "Final error");
+    ///    if true { Ok(35) } else { Err(44u64)}
+    /// }).sync();
+    /// assert_eq!(r, Ok(35));
+    /// ``` 
+    pub fn then<TT,EE,FT,FE>(self,ft:FT,fe:FE) -> Deferred<TT,EE> 
+        where   TT: Send + 'static, EE: Send + 'static,
+                FT: Send + 'static + FnOnce(T) -> Result<TT,EE>, 
+                FE: Send + 'static + FnOnce(E) -> Result<TT,EE> {
+        Deferred::<TT,EE> {
+            f: Box::new(|| {
+                match self.unlock() {
+                    Ok(t) => ft(t),
+                    Err(e) => fe(e),
+                }
+            })
         }
     }
 
-    /// Chain a deferred to another deferred. 
+    /// The same functionality as **then**, but wraps the result in only one function
     ///
     /// ```rust
-    /// let deferred = asynchronous::Deferred::new(|| {
-    ///    // Do something  
-    ///    if true { Ok("value a") } else { Err("Error description") }
+    /// let r = asynchronous::Deferred::new(|| {
+    ///    if false { Ok(1.23) } else { Err("Final error")}
     /// }).chain(|res| {
-    ///    assert_eq!(res.unwrap(), "value a");
-    ///    if true { Ok("value b") } else { Err("Error description") }
-    /// });        
-    /// ``` 
-    pub fn chain<TT,EE,F>(self, f:F) -> Deferred<TT,EE> 
+    ///    // Do something that executes always even on error
+    ///    assert!(res.is_err());
+    ///    res
+    /// }).then(|res| {
+    ///    unreachable!();
+    ///    assert_eq!(res, 1.23);
+    ///    Ok(34)
+    /// }, |err| {
+    ///    assert_eq!(err, "Final error");
+    ///    if true { Ok(35) } else { Err(44u64)}
+    /// }).sync();
+    /// assert_eq!(r, Ok(35));
+    /// ```   
+    pub fn chain<TT,EE,FF>(self, f:FF) -> Deferred<TT,EE> 
         where   TT: Send + 'static, EE : Send + 'static,         
-                F : Send + 'static + FnOnce(Result<T,E>) -> Result<TT,EE> {
-        let (tx,rx) = mpsc::channel();
-        let pair = Arc::new((Mutex::new(false), Condvar::new()));
-        let pair_c = pair.clone();
-        thread::spawn(move|| {
-            // wait for the thread to start up
-            let &(ref lock, ref cvar) = &*pair_c;
-            let mut started = lock.lock().unwrap();    
-            while !*started {  started = cvar.wait(started).unwrap(); }            
-            self.unlock();            
-            tx.send(f(self.receiver.recv().unwrap()))
-        });
-        Deferred::<TT,EE> {
-            starter   : pair,
-            receiver  : rx
+                FF: Send + 'static + FnOnce(Result<T,E>) -> Result<TT,EE> {
+        Deferred::<TT,EE> { f: Box::new(|| { f(self.unlock()) }) }
+    }
+
+    /// Executes a new task if the result of the previous promise is Ok. It may return a new type in a correct result (Ok),
+    /// but it must return the same type of error of its previous promise.
+    ///
+    /// ```rust
+    /// asynchronous::Deferred::new(|| {
+    ///    Ok(1.23)
+    /// }).success(|res| {
+    ///    assert_eq!(res, 1.23);
+    ///    Ok(34)
+    /// }).success(|res| {
+    ///    assert_eq!(res, 34);
+    ///    if true { Ok(res) } else { Err("Final error")}
+    /// }).sync();
+    /// ```   
+    pub fn success<TT,F>(self,f:F) -> Deferred<TT,E> where F: Send + 'static + FnOnce(T) -> Result<TT,E>, TT: Send + 'static {      
+        Deferred::<TT,E> {
+            f: Box::new(|| {
+                match self.unlock() {
+                    Ok(t) => f(t),
+                    Err(e) => Err(e),
+                }
+            })
         }
+    }
+
+    /// Executes a new task if the result of the previous promise is Err. It may return a new type in a correct result (Ok),
+    /// but it must return the same type of error of its previous promise.
+    ///
+    /// ```rust
+    /// asynchronous::Deferred::new(|| {
+    ///    Err(32)
+    /// }).success(|res| {
+    ///    unreachable!();
+    ///    Ok(res)
+    /// }).fail(|err| {
+    ///    assert_eq!(err, 32);
+    ///    Ok("Value Ok")
+    /// }).sync();
+    /// ```       
+    pub fn fail<F>(self,f:F) -> Deferred<T,E> where F: Send + 'static + FnOnce(E) -> Result<T,E> {
+        Deferred::<T,E> {
+            f: Box::new(|| {
+                match self.unlock() {
+                    Ok(t) => Ok(t),
+                    Err(e) => f(e),
+                }
+            })
+        }        
     }
 
     /// Executes the task stored and returns a Promise
@@ -189,12 +274,12 @@ impl<T,E> Deferred<T,E> where T: Send + 'static , E: Send + 'static {
     ///    // Do something  
     ///    if true { Ok("value a") } else { Err("Error description") }
     /// });
+    /// // deferred is only stored in memory waiting for .sync() or .to_promise()
     /// deferred.to_promise();
     /// // At this point "deferred" is executing
     /// ```             
     pub fn to_promise(self) -> Promise<T,E> {
-        self.unlock();
-        Promise { receiver: self.receiver }
+        Promise::new(self.f)
     }
 
     /// Executes a vector of tasks and returns a Promise with a vector of values in case that all tasks ended ok.
@@ -247,9 +332,8 @@ impl<T,E> Deferred<T,E> where T: Send + 'static , E: Send + 'static {
         let (tx,rx) = mpsc::channel();
         thread::spawn(move || {
             let mut results:Vec<T> = Vec::new();                            
-            for defer in vector {
-                defer.unlock();
-                match defer.receiver.recv().unwrap() {
+            for defer in vector {                
+                match defer.unlock() {
                     Ok(t) => {
                         results.push(t);
                         if num_first > 0 && results.len() >= num_first { break }
@@ -298,15 +382,10 @@ impl<T,E> Deferred<T,E> where T: Send + 'static , E: Send + 'static {
                     if num_first > 0 && num_results_received >= num_first { break }
                     match it.next() {
                         Some(defer) => {                                                        
-                            active_process += 1;
-                            defer.unlock();
+                            active_process += 1;                            
                             let txinter_cloned = txinter.clone();
                             thread::spawn(move || {
-                                match defer.receiver.recv() {
-                                    Ok(r) => { &txinter_cloned.send((id_process, r)); } ,                                    
-                                    Err(_) => (),
-                                }
-                                
+                                &txinter_cloned.send((id_process, defer.unlock()));
                             });
                             id_process += 1;
                         },
@@ -338,14 +417,14 @@ impl<T,E> Deferred<T,E> where T: Send + 'static , E: Send + 'static {
             tx.send(ok_results).unwrap()
         });
         Promise::<Vec<T>, Vec<Result<T,E>>> { receiver: rx }
-    }
+    }    
 
-    fn unlock(&self) {
-        let &(ref lock, ref cvar) = &*self.starter;        
-        let mut started = lock.lock().unwrap();
-        *started = true;
-        cvar.notify_one();            
-    }
+
+
+    fn unlock(self) -> Result<T,E> {
+        (self.f)()
+    }    
+
 }
 
 /// Stores a result of previous execution tasks. 
@@ -449,6 +528,36 @@ impl<T,E> Promise<T,E> where T: Send + 'static , E: Send + 'static {
         });
         Promise::<TT,EE> { receiver: rx }
     }
+
+    /// The same functionality as **then**, but wraps the result in only one function
+    ///
+    /// ```rust
+    /// let r = asynchronous::Promise::new(|| {
+    ///    if false { Ok(1.23) } else { Err("Final error")}
+    /// }).chain(|res| {
+    ///    // Do something that executes always even on error
+    ///    assert!(res.is_err());
+    ///    res
+    /// }).then(|res| {
+    ///    unreachable!();
+    ///    assert_eq!(res, 1.23);
+    ///    Ok(34)
+    /// }, |err| {
+    ///    assert_eq!(err, "Final error");
+    ///    if true { Ok(35) } else { Err(44u64)}
+    /// }).sync();
+    /// assert_eq!(r, Ok(35));
+    /// ```   
+    pub fn chain<TT,EE,F>(self, f:F) -> Promise<TT,EE> 
+        where TT: Send + 'static, EE: Send + 'static,
+              F: Send + 'static + FnOnce(Result<T,E>) -> Result<TT,EE> {
+        let (tx,rx) = mpsc::channel();
+        thread::spawn(move || { 
+            let res = self.receiver.recv().unwrap();
+            tx.send(f(res))
+        });
+        Promise::<TT,EE> { receiver: rx }
+    }    
 
     /// Executes a new task if the result of the previous promise is Ok. It may return a new type in a correct result (Ok),
     /// but it must return the same type of error of its previous promise.
@@ -555,43 +664,13 @@ impl<T,E> Promise<T,E> where T: Send + 'static , E: Send + 'static {
         };
     }   
 
-    /// The same functionality as **then**, but wraps the result in only one function
-    ///
-    /// ```rust
-    /// let r = asynchronous::Promise::new(|| {
-    ///    if false { Ok(1.23) } else { Err("Final error")}
-    /// }).then_wrap(|res| {
-    ///    // Do something that executes always even on error
-    ///    assert!(res.is_err());
-    ///    res
-    /// }).then(|res| {
-    ///    unreachable!();
-    ///    assert_eq!(res, 1.23);
-    ///    Ok(34)
-    /// }, |err| {
-    ///    assert_eq!(err, "Final error");
-    ///    if true { Ok(35) } else { Err(44u64)}
-    /// }).sync();
-    /// assert_eq!(r, Ok(35));
-    /// ```   
-    pub fn then_wrap<TT,EE,F>(self, f:F) -> Promise<TT,EE> 
-        where TT: Send + 'static, EE: Send + 'static,
-              F: Send + 'static + FnOnce(Result<T,E>) -> Result<TT,EE> {
-        let (tx,rx) = mpsc::channel();
-        thread::spawn(move || { 
-            let res = self.receiver.recv().unwrap();
-            tx.send(f(res))
-        });
-        Promise::<TT,EE> { receiver: rx }
-    }
-
     /// The same functionality as **finally**, but wraps the result in only one function
     ///
     /// ```rust
     /// asynchronous::Promise::new(|| {
     ///    std::thread::sleep_ms(100);
     ///    if true { Ok(32) } else { Err("Error txt") }
-    /// }).finally_wrap(|res| { 
+    /// }).chain_finally(|res| { 
     ///    // Executed always at the end.
     ///    assert_eq!(res.unwrap(), 32);
     /// });
@@ -599,7 +678,7 @@ impl<T,E> Promise<T,E> where T: Send + 'static , E: Send + 'static {
     /// let a = 2 + 3;  // This line is executed before the above Promise
     /// 
     /// ``` 
-    pub fn finally_wrap<F>(self, f:F) where F: Send + 'static + FnOnce(Result<T,E>) {
+    pub fn chain_finally<F>(self, f:F) where F: Send + 'static + FnOnce(Result<T,E>) {
         thread::spawn(move || {
             f(self.receiver.recv().unwrap());
         });
@@ -611,7 +690,7 @@ impl<T,E> Promise<T,E> where T: Send + 'static , E: Send + 'static {
     /// asynchronous::Promise::new(|| {
     ///    std::thread::sleep_ms(100);
     ///    if true { Ok(32) } else { Err("Error txt") }
-    /// }).finally_sync_wrap(|res| { 
+    /// }).chain_finally_sync(|res| { 
     ///    // Executed always at the end.
     ///    assert_eq!(res.unwrap(), 32);
     /// });
@@ -619,7 +698,7 @@ impl<T,E> Promise<T,E> where T: Send + 'static , E: Send + 'static {
     /// let a = 2 + 3;  // This line is executed after the above Promise
     /// 
     /// ``` 
-    pub fn finally_sync_wrap<F>(self, f:F) where F: Send + 'static + FnOnce(Result<T,E>) {
+    pub fn chain_finally_sync<F>(self, f:F) where F: Send + 'static + FnOnce(Result<T,E>) {
         f(self.sync());
     }    
 
