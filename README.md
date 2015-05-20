@@ -48,12 +48,9 @@ Promise::new(|| {
   assert_eq!(res, 10.0 / 3.0);
   let res_int = res as u32 * 2;
   Ok(res_int)
-}).finally_sync(|res| {       // res has type u32
-  // Catch a correct result
-  assert_eq!(res, 6u32);
-}, |error| {
-  // Catch an incorrect result
-  unreachable!();
+}).finally_wrap_sync(|res| {       // res has type Result<u32,&str>
+  // Executed always at the end
+  assert_eq!(res.unwrap(), 6u32);
 });
 ``` 
 

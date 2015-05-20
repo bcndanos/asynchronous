@@ -38,7 +38,7 @@ Promise::new(|| {
   assert_eq!(res, 10.0 / 3.0);
   let res_int = res as u32 * 2;
   Ok(res_int)
-}).chain_finally_sync(|res| {       // res has type Result<u32,&str>
+}).finally_wrap_sync(|res| {       // res has type Result<u32,&str>
   // Executed always at the end
   assert_eq!(res.unwrap(), 6u32);
 });
@@ -670,7 +670,7 @@ impl<T,E> Promise<T,E> where T: Send + 'static , E: Send + 'static {
     /// asynchronous::Promise::new(|| {
     ///    std::thread::sleep_ms(100);
     ///    if true { Ok(32) } else { Err("Error txt") }
-    /// }).chain_finally(|res| { 
+    /// }).finally_wrap(|res| { 
     ///    // Executed always at the end.
     ///    assert_eq!(res.unwrap(), 32);
     /// });
@@ -678,7 +678,7 @@ impl<T,E> Promise<T,E> where T: Send + 'static , E: Send + 'static {
     /// let a = 2 + 3;  // This line is executed before the above Promise
     /// 
     /// ``` 
-    pub fn chain_finally<F>(self, f:F) where F: Send + 'static + FnOnce(Result<T,E>) {
+    pub fn finally_wrap<F>(self, f:F) where F: Send + 'static + FnOnce(Result<T,E>) {
         thread::spawn(move || {
             f(self.receiver.recv().unwrap());
         });
@@ -690,7 +690,7 @@ impl<T,E> Promise<T,E> where T: Send + 'static , E: Send + 'static {
     /// asynchronous::Promise::new(|| {
     ///    std::thread::sleep_ms(100);
     ///    if true { Ok(32) } else { Err("Error txt") }
-    /// }).chain_finally_sync(|res| { 
+    /// }).finally_wrap_sync(|res| { 
     ///    // Executed always at the end.
     ///    assert_eq!(res.unwrap(), 32);
     /// });
@@ -698,7 +698,7 @@ impl<T,E> Promise<T,E> where T: Send + 'static , E: Send + 'static {
     /// let a = 2 + 3;  // This line is executed after the above Promise
     /// 
     /// ``` 
-    pub fn chain_finally_sync<F>(self, f:F) where F: Send + 'static + FnOnce(Result<T,E>) {
+    pub fn finally_wrap_sync<F>(self, f:F) where F: Send + 'static + FnOnce(Result<T,E>) {
         f(self.sync());
     }    
 
