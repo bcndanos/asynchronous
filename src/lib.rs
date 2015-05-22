@@ -38,7 +38,7 @@ Promise::new(|| {
   assert_eq!(res, 10.0 / 3.0);
   let res_int = res as u32 * 2;
   Ok(res_int)
-}).finally_sync_wrap(|res| {       // res has type Result<u32,&str>
+}).finally_sync(|res| {       // res has type Result<u32,&str>
   // Executed always at the end
   assert_eq!(res.unwrap(), 6u32);
 });
@@ -73,11 +73,9 @@ promise.success(|res| {
     // Catch the error and execute another Promise
     assert_eq!(error, vec![Ok(1u32), Err("Mock Error"), Ok(3u32)]);    
     Deferred::vec_to_promise(vec![d4,d5], ControlFlow::Series).sync()
-}).finally_sync(|res| {   // res : Vec<u32>
+}).finally_sync(|res| {   // res : Result<Vec<u32>,&str>
     // Do something here    
-    assert_eq!(res, vec![4u32, 5u32]);
-}, |error| {              // error : Vec<Result<u32,&str>>
-    // Check Errors
+    assert_eq!(res.unwrap(), vec![4u32, 5u32]);
 });
 
 ``` 
@@ -91,10 +89,8 @@ let el = EventLoop::new().finish_in_ms(100);
 el.emit("Event1");
 el.emit("Event2");
 // Do something here
-el.to_promise().finally_sync(|res| {  // res: Vec<Ev>
-    assert_eq!(res, vec!["Event1", "Event2"]);
-}, |error| {
-    // Check Errors
+el.to_promise().finally_sync(|res| {  // res: Result<Vec<Ev>,()>
+    assert_eq!(res.unwrap(), vec!["Event1", "Event2"]);
 });
 ``` 
 
@@ -124,6 +120,7 @@ pub struct Deferred<T,E> {
     receiver : mpsc::Receiver<Result<T,E>>
 }
 
+
 impl<T,E> Deferred<T,E> where T: Send + 'static , E: Send + 'static {
     /// Create a new task in deferred.
     ///
@@ -151,20 +148,89 @@ impl<T,E> Deferred<T,E> where T: Send + 'static , E: Send + 'static {
         }
     }
 
-    /// Chain a deferred to another deferred. 
+    /// Syncronizes the execution with the caller, and returns its value.
     ///
     /// ```rust
-    /// let deferred = asynchronous::Deferred::new(|| {
+    /// use asynchronous::Deferred;
+    /// 
+    /// let deferred_a = Deferred::<_,&str>::new(|| {
     ///    // Do something  
-    ///    if true { Ok("value a") } else { Err("Error description") }
-    /// }).chain(|res| {
-    ///    assert_eq!(res.unwrap(), "value a");
-    ///    if true { Ok("value b") } else { Err("Error description") }
-    /// });        
+    ///    Ok("value a")
+    /// });
+    /// let deferred_b = Deferred::<_,&str>::new(|| {    
+    ///    // Do something 
+    ///    Ok("value b")
+    /// });
+    /// // Do something
+    /// assert_eq!(deferred_a.sync(), Ok("value a"));
+    /// assert_eq!(deferred_b.sync(), Ok("value b"));
     /// ``` 
-    pub fn chain<TT,EE,F>(self, f:F) -> Deferred<TT,EE> 
+    pub fn sync(self) -> Result<T,E> {        
+        self.to_promise().sync()
+    }
+
+    /// Executes only one of the two functions received depending on the result of the previous task deferred (Ok or Err). 
+    /// Returns a new Deferred
+    ///
+    /// ```rust
+    /// let r = asynchronous::Deferred::new(|| {
+    ///    if false { Ok(1.23) } else { Err("Final error")}
+    /// }).then(|res| {
+    ///    unreachable!();
+    ///    assert_eq!(res, 1.23);
+    ///    Ok(34)
+    /// }, |err| {
+    ///    assert_eq!(err, "Final error");
+    ///    if true { Ok(35) } else { Err(44u64)}
+    /// }).sync();
+    /// assert_eq!(r, Ok(35));
+    /// ``` 
+    pub fn then<TT,EE,FT,FE>(self,ft:FT,fe:FE) -> Deferred<TT,EE> 
+        where   TT: Send + 'static, EE: Send + 'static,
+                FT: Send + 'static + FnOnce(T) -> Result<TT,EE>, 
+                FE: Send + 'static + FnOnce(E) -> Result<TT,EE> {
+        let (tx,rx) = mpsc::channel();
+        let pair = Arc::new((Mutex::new(false), Condvar::new()));
+        let pair_c = pair.clone();
+        thread::spawn(move|| {
+            // wait for the thread to start up
+            let &(ref lock, ref cvar) = &*pair_c;
+            let mut started = lock.lock().unwrap();    
+            while !*started {  started = cvar.wait(started).unwrap(); }            
+            self.unlock();            
+            tx.send(match self.receiver.recv().unwrap() {
+                Ok(t) => ft(t),
+                Err(e) => fe(e),
+            })
+        });
+        Deferred::<TT,EE> {
+            starter   : pair,
+            receiver  : rx
+        }
+    }
+
+    /// The same functionality as **then**, but wraps the result in only one function
+    ///
+    /// ```rust
+    /// let r = asynchronous::Deferred::new(|| {
+    ///    if false { Ok(1.23) } else { Err("Final error")}
+    /// }).chain(|res| {
+    ///    // Do something that executes always even on error
+    ///    assert!(res.is_err());
+    ///    res
+    /// }).then(|res| {
+    ///    unreachable!();
+    ///    assert_eq!(res, 1.23);
+    ///    Ok(34)
+    /// }, |err| {
+    ///    assert_eq!(err, "Final error");
+    ///    if true { Ok(35) } else { Err(44u64)}
+    /// }).sync();
+    /// assert_eq!(r, Ok(35));
+    /// ```   
+    pub fn chain<TT,EE,FF>(self, f:FF) -> Deferred<TT,EE> 
         where   TT: Send + 'static, EE : Send + 'static,         
-                F : Send + 'static + FnOnce(Result<T,E>) -> Result<TT,EE> {
+                FF: Send + 'static + FnOnce(Result<T,E>) -> Result<TT,EE> {
         let (tx,rx) = mpsc::channel();
         let pair = Arc::new((Mutex::new(false), Condvar::new()));
         let pair_c = pair.clone();
@@ -182,6 +248,112 @@ impl<T,E> Deferred<T,E> where T: Send + 'static , E: Send + 'static {
         }
     }
 
+    /// Executes a new task if the result of the previous promise is Ok. It may return a new type in a correct result (Ok),
+    /// but it must return the same type of error of its previous promise.
+    ///
+    /// ```rust
+    /// asynchronous::Deferred::new(|| {
+    ///    Ok(1.23)
+    /// }).success(|res| {
+    ///    assert_eq!(res, 1.23);
+    ///    Ok(34)
+    /// }).success(|res| {
+    ///    assert_eq!(res, 34);
+    ///    if true { Ok(res) } else { Err("Final error")}
+    /// }).sync();
+    /// ```   
+    pub fn success<TT,F>(self,f:F) -> Deferred<TT,E> where F: Send + 'static + FnOnce(T) -> Result<TT,E>, TT: Send + 'static {      
+        let (tx,rx) = mpsc::channel();
+        let pair = Arc::new((Mutex::new(false), Condvar::new()));
+        let pair_c = pair.clone();
+        thread::spawn(move|| {
+            // wait for the thread to start up
+            let &(ref lock, ref cvar) = &*pair_c;
+            let mut started = lock.lock().unwrap();    
+            while !*started {  started = cvar.wait(started).unwrap(); }            
+            self.unlock();            
+            tx.send(match self.receiver.recv().unwrap() {
+                Ok(t) => f(t),
+                Err(e) => Err(e),
+            })
+        });
+        Deferred::<TT,E> {
+            starter   : pair,
+            receiver  : rx
+        }
+    }
+
+    /// Executes a new task if the result of the previous promise is Err. It may return a new type in a correct result (Ok),
+    /// but it must return the same type of error of its previous promise.
+    ///
+    /// ```rust
+    /// asynchronous::Deferred::new(|| {
+    ///    Err(32)
+    /// }).success(|res| {
+    ///    unreachable!();
+    ///    Ok(res)
+    /// }).fail(|err| {
+    ///    assert_eq!(err, 32);
+    ///    Ok("Value Ok")
+    /// }).sync();
+    /// ```       
+    pub fn fail<F>(self,f:F) -> Deferred<T,E> where F: Send + 'static + FnOnce(E) -> Result<T,E> {
+        let (tx,rx) = mpsc::channel();
+        let pair = Arc::new((Mutex::new(false), Condvar::new()));
+        let pair_c = pair.clone();
+        thread::spawn(move|| {
+            // wait for the thread to start up
+            let &(ref lock, ref cvar) = &*pair_c;
+            let mut started = lock.lock().unwrap();    
+            while !*started {  started = cvar.wait(started).unwrap(); }            
+            self.unlock();            
+            tx.send(match self.receiver.recv().unwrap() {
+                Ok(t) => Ok(t),
+                Err(e) => f(e),
+            })
+        });
+        Deferred::<T,E> {
+            starter   : pair,
+            receiver  : rx
+        }
+    }
+
+    /// Executes one function with the result of the previous deferred.
+    /// It doesn't return anything and it's completly asynchronous.
+    ///
+    /// ```rust
+    /// asynchronous::Deferred::new(|| {
+    ///    std::thread::sleep_ms(100);
+    ///    if true { Ok(32) } else { Err("Error txt") }
+    /// }).finally(|res| { 
+    ///    assert_eq!(res.unwrap(), 32);
+    /// });
+    ///
+    /// let a = 2 + 3;  // This line is executed before the above Promise
+    /// 
+    /// ```   
+    pub fn finally<F>(self, f:F) where F: Send + 'static + FnOnce(Result<T,E>) {
+        self.to_promise().finally(f);
+    }       
+
+    /// Executes one function with the result of the previous deferred.
+    /// It doesn't return anything, but it's synchronized with the caller
+    ///
+    /// ```rust
+    /// use asynchronous::Promise;
+    /// 
+    /// Promise::new(|| {
+    ///    std::thread::sleep_ms(100);
+    ///    if true { Ok(32) } else { Err("Error txt") }
+    /// }).finally_sync(|res| { 
+    ///    assert_eq!(res.unwrap(), 32);
+    /// });    
+    ///
+    /// let a = 2 + 3;  // This line is executed after the above Promise
+    pub fn finally_sync<F>(self, f:F) where F: Send + 'static + FnOnce(Result<T,E>) {
+        self.to_promise().finally_sync(f);
+    }           
+
     /// Executes the task stored and returns a Promise
     ///
     /// ```rust
@@ -189,6 +361,7 @@ impl<T,E> Deferred<T,E> where T: Send + 'static , E: Send + 'static {
     ///    // Do something  
     ///    if true { Ok("value a") } else { Err("Error description") }
     /// });
+    /// // deferred is only stored in memory waiting for .sync() or .to_promise()
     /// deferred.to_promise();
     /// // At this point "deferred" is executing
     /// ```             
@@ -231,8 +404,8 @@ impl<T,E> Deferred<T,E> where T: Send + 'static , E: Send + 'static {
     /// // The first 5 tasks that ended with Ok
     /// let _ = Deferred::first_to_promise(5, false, v, ControlFlow::ParallelLimit(3))   
     /// .finally_sync(|res| {           
-    ///    assert_eq!(res.len(), 5);                
-    /// }, |_| { });
+    ///    assert_eq!(res.unwrap().len(), 5);                
+    /// });
     /// ```     
     pub fn first_to_promise(num_first:usize, wait:bool, vector:Vec<Deferred<T,E>>, control: ControlFlow) -> Promise<Vec<T>,Vec<Result<T,E>>> {
         match control {
@@ -450,6 +623,36 @@ impl<T,E> Promise<T,E> where T: Send + 'static , E: Send + 'static {
         Promise::<TT,EE> { receiver: rx }
     }
 
+    /// The same functionality as **then**, but wraps the result in only one function
+    ///
+    /// ```rust
+    /// let r = asynchronous::Promise::new(|| {
+    ///    if false { Ok(1.23) } else { Err("Final error")}
+    /// }).chain(|res| {
+    ///    // Do something that executes always even on error
+    ///    assert!(res.is_err());
+    ///    res
+    /// }).then(|res| {
+    ///    unreachable!();
+    ///    assert_eq!(res, 1.23);
+    ///    Ok(34)
+    /// }, |err| {
+    ///    assert_eq!(err, "Final error");
+    ///    if true { Ok(35) } else { Err(44u64)}
+    /// }).sync();
+    /// assert_eq!(r, Ok(35));
+    /// ```   
+    pub fn chain<TT,EE,F>(self, f:F) -> Promise<TT,EE> 
+        where TT: Send + 'static, EE: Send + 'static,
+              F: Send + 'static + FnOnce(Result<T,E>) -> Result<TT,EE> {
+        let (tx,rx) = mpsc::channel();
+        thread::spawn(move || { 
+            let res = self.receiver.recv().unwrap();
+            tx.send(f(res))
+        });
+        Promise::<TT,EE> { receiver: rx }
+    }    
+
     /// Executes a new task if the result of the previous promise is Ok. It may return a new type in a correct result (Ok),
     /// but it must return the same type of error of its previous promise.
     ///
@@ -502,9 +705,7 @@ impl<T,E> Promise<T,E> where T: Send + 'static , E: Send + 'static {
         Promise::<T,E> { receiver: rx }
     }
 
-    
-
-    /// Executes only one of the two functions received depending on the result of the previous promise (Ok or Err). 
+    /// Executes one function with the result of the previous promise.
     /// It doesn't return anything and it's completly asynchronous.
     ///
     /// ```rust
@@ -512,26 +713,19 @@ impl<T,E> Promise<T,E> where T: Send + 'static , E: Send + 'static {
     ///    std::thread::sleep_ms(100);
     ///    if true { Ok(32) } else { Err("Error txt") }
     /// }).finally(|res| { 
-    ///    assert_eq!(res, 32);
-    /// }, |err|{
-    ///    unreachable!();        
-    ///    assert_eq!(err, "Error txt");
+    ///    assert_eq!(res.unwrap(), 32);
     /// });
     ///
     /// let a = 2 + 3;  // This line is executed before the above Promise
     /// 
-    /// ```           
-    pub fn finally<FT,FE>(self, ft:FT, fe:FE) where FT: Send + 'static + FnOnce(T) , FE: Send + 'static + FnOnce(E) {
+    /// ```   
+    pub fn finally<F>(self, f:F) where F: Send + 'static + FnOnce(Result<T,E>) {
         thread::spawn(move || {
-            let res = self.receiver.recv().unwrap();
-            match res {
-                Ok(t) => ft(t),
-                Err(e) => fe(e)
-            };
-        });     
-    }
+            f(self.receiver.recv().unwrap());
+        });
+    }       
 
-    /// Executes only one of the two functions received depending on the result of the previous promise (Ok or Err). 
+    /// Executes one function with the result of the previous promise.
     /// It doesn't return anything, but it's synchronized with the caller
     ///
     /// ```rust
@@ -541,88 +735,13 @@ impl<T,E> Promise<T,E> where T: Send + 'static , E: Send + 'static {
     ///    std::thread::sleep_ms(100);
     ///    if true { Ok(32) } else { Err("Error txt") }
     /// }).finally_sync(|res| { 
-    ///    assert_eq!(res, 32);
-    /// }, |err|{
-    ///    unreachable!();        
-    ///    assert_eq!(err, "Error txt");
+    ///    assert_eq!(res.unwrap(), 32);
     /// });    
     ///
     /// let a = 2 + 3;  // This line is executed after the above Promise
-    pub fn finally_sync<FT,FE>(self, ft:FT, fe:FE) where FT: Send + 'static + FnOnce(T) , FE: Send + 'static +FnOnce(E) {
-        match self.sync() {
-            Ok(t) => ft(t),
-            Err(e) => fe(e)
-        };
-    }   
-
-    /// The same functionality as **then**, but wraps the result in only one function
-    ///
-    /// ```rust
-    /// let r = asynchronous::Promise::new(|| {
-    ///    if false { Ok(1.23) } else { Err("Final error")}
-    /// }).then_wrap(|res| {
-    ///    // Do something that executes always even on error
-    ///    assert!(res.is_err());
-    ///    res
-    /// }).then(|res| {
-    ///    unreachable!();
-    ///    assert_eq!(res, 1.23);
-    ///    Ok(34)
-    /// }, |err| {
-    ///    assert_eq!(err, "Final error");
-    ///    if true { Ok(35) } else { Err(44u64)}
-    /// }).sync();
-    /// assert_eq!(r, Ok(35));
-    /// ```   
-    pub fn then_wrap<TT,EE,F>(self, f:F) -> Promise<TT,EE> 
-        where TT: Send + 'static, EE: Send + 'static,
-              F: Send + 'static + FnOnce(Result<T,E>) -> Result<TT,EE> {
-        let (tx,rx) = mpsc::channel();
-        thread::spawn(move || { 
-            let res = self.receiver.recv().unwrap();
-            tx.send(f(res))
-        });
-        Promise::<TT,EE> { receiver: rx }
-    }
-
-    /// The same functionality as **finally**, but wraps the result in only one function
-    ///
-    /// ```rust
-    /// asynchronous::Promise::new(|| {
-    ///    std::thread::sleep_ms(100);
-    ///    if true { Ok(32) } else { Err("Error txt") }
-    /// }).finally_wrap(|res| { 
-    ///    // Executed always at the end.
-    ///    assert_eq!(res.unwrap(), 32);
-    /// });
-    ///
-    /// let a = 2 + 3;  // This line is executed before the above Promise
-    /// 
-    /// ``` 
-    pub fn finally_wrap<F>(self, f:F) where F: Send + 'static + FnOnce(Result<T,E>) {
-        thread::spawn(move || {
-            f(self.receiver.recv().unwrap());
-        });
-    }
-
-    /// The same functionality as **finally_sync**, but wraps the result in only one function
-    ///
-    /// ```rust
-    /// asynchronous::Promise::new(|| {
-    ///    std::thread::sleep_ms(100);
-    ///    if true { Ok(32) } else { Err("Error txt") }
-    /// }).finally_sync_wrap(|res| { 
-    ///    // Executed always at the end.
-    ///    assert_eq!(res.unwrap(), 32);
-    /// });
-    ///
-    /// let a = 2 + 3;  // This line is executed after the above Promise
-    /// 
-    /// ``` 
-    pub fn finally_sync_wrap<F>(self, f:F) where F: Send + 'static + FnOnce(Result<T,E>) {
+    pub fn finally_sync<F>(self, f:F) where F: Send + 'static + FnOnce(Result<T,E>) {
         f(self.sync());
-    }    
-
+    }        
 }
 
 // Event Loops //
@@ -679,10 +798,8 @@ impl<Ev> EventLoopHandler<Ev>  where Ev: Send + 'static {
     ///    if *lock_x <= 3 { Emit::Event("Event Test") } else { Emit::Stop }
     /// });    
     /// // Do something here
-    /// el.finish_in_ms(100).to_promise().finally_sync(|res| {  // res: Vec<Ev>
-    ///     assert_eq!(res, vec!["Event Test", "Event Test", "Event Test"]);
-    /// }, |error| {
-    ///     // Check Errors
+    /// el.finish_in_ms(100).to_promise().finally_sync(|res| {  // res: Result<Vec<Ev>,()>
+    ///     assert_eq!(res.unwrap(), vec!["Event Test", "Event Test", "Event Test"]);
     /// });
     /// ```     
     pub fn emit_until<F>(&self, f:F)  where F : Send + 'static + Fn() -> Emit<Ev> {
@@ -744,10 +861,8 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
     /// el.emit("Event1");
     /// el.emit("Event2");
     /// // Do something here
-    /// el.to_promise().finally_sync(|res| {  // res: Vec<Ev>
-    ///     assert_eq!(res, vec!["Event1", "Event2"]);
-    /// }, |error| {
-    ///     // Check Errors
+    /// el.to_promise().finally_sync(|res| {  // res: Result<Vec<Ev>,()>
+    ///     assert_eq!(res.unwrap(), vec!["Event1", "Event2"]);
     /// });
     /// ``` 
     pub fn new() -> EventLoop<Ev> {
@@ -795,10 +910,8 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
     /// el.emit(MiEvents::Hello("World".to_string()));
     /// el.emit(MiEvents::Goodbye(3));
     /// // Do something here
-    /// el.finish().to_promise().finally_sync(|res| {  // res: Vec<Ev>
-    ///     assert_eq!(res.len(), 0);
-    /// }, |error| {
-    ///     // Check Errors
+    /// el.finish().to_promise().finally_sync(|res| {  // res: Result<Vec<Ev>,()>
+    ///     assert_eq!(res.unwrap().len(), 0);
     /// });
     /// ```     
     pub fn on<F>(f:F) -> EventLoop<Ev> where F : Send + 'static + Fn(Ev) {      
@@ -846,11 +959,10 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
     /// el.emit(MiEvents::Hello("World".to_string()));
     /// el.emit(MiEvents::Goodbye(555));
     /// // Do something here
-    /// el.finish().to_promise().finally_sync(|res| {  // res: Vec<Ev>
-    ///     assert_eq!(res.len(), 1);
-    ///     match res[0] { MiEvents::Goodbye(v) => assert_eq!(v, 555), _=> () };
-    /// }, |error| {
-    ///     // Check Errors
+    /// el.finish().to_promise().finally_sync(|res| {  // res: Result<Vec<Ev>,()>
+    ///     let vec_res = res.unwrap();
+    ///     assert_eq!(vec_res.len(), 1);
+    ///     match vec_res[0] { MiEvents::Goodbye(vec_res) => assert_eq!(vec_res, 555), _=> () };
     /// });
     /// ```         
     pub fn on_managed<F>(f:F) -> EventLoop<Ev> where F : Send + 'static + Fn(Ev) -> Emit<Ev> {      
@@ -905,10 +1017,8 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
     ///    if *lock_x <= 3 { Emit::Event("Event Test") } else { Emit::Stop }
     /// });    
     /// // Do something here
-    /// el.finish_in_ms(100).to_promise().finally_sync(|res| {  // res: Vec<Ev>
-    ///     assert_eq!(res, vec!["Event Test", "Event Test", "Event Test"]);
-    /// }, |error| {
-    ///     // Check Errors
+    /// el.finish_in_ms(100).to_promise().finally_sync(|res| {  // res: Result<Vec<Ev>,()>
+    ///     assert_eq!(res.unwrap(), vec!["Event Test", "Event Test", "Event Test"]);
     /// });
     /// ```     
     pub fn emit_until<F>(&self, f:F)  where F : Send + 'static + Fn() -> Emit<Ev> {
@@ -954,574 +1064,4 @@ impl<Ev> EventLoop<Ev> where Ev: Send + 'static {
             Ok(vec)
         })
     }         
-}
-
-#[cfg(test)]
-mod test {
-    use std::sync::{Arc, Mutex};
-    use std::thread;
-    use super::*;   
-
-    #[test]
-    fn promises() {     
-        for x in 0..10 {
-            let promise = Promise::<u32,&str>::new(move || { 
-                match x {
-                    0 => Err("Division by zero"),
-                    _ => Ok(x * 2)
-                }
-            }).success(move |res| {
-                assert_eq!(res, x * 2);
-                Ok(res * 2) 
-            }).fail(|error| {
-                assert_eq!(error, "Division by zero");
-                Err(error)
-            }) ;
-
-            let result = promise.sync();
-
-            match x {
-                0 => assert!(result.is_err()),
-                _ => {
-                    assert!(result.is_ok());
-                    assert_eq!(result.unwrap(), x * 4);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn promises_parallel() {
-        let promise1 = Promise::<u32,&str>::new(|| {
-            Ok(1u32)
-        });
-        let promise2 = Promise::<u32,&str>::new(|| {
-            Ok(2u32)
-        });
-        let promise3 = Promise::<u32,&str>::new(|| {
-            Ok(3u32)
-        });
-        let promise4 = Promise::<u32,&str>::new(|| {
-            Err("Error")
-        });
-        let promise5 = Promise::<u32,&str>::new(|| {
-            Ok(5u32)
-        });        
-        Promise::all(vec![promise1, promise2, promise3]).finally_sync(|res| {
-            assert_eq!(res, vec![1u32,2u32,3u32]);
-        }, |err| {
-            unreachable!("{:?}", err);
-        });
-        Promise::all(vec![promise4, promise5]).finally_sync(|res| {
-            unreachable!("{:?}", res);
-        }, |err:Vec<Result<u32,&str>>| {            
-            assert!(err[0].is_err());
-            assert!(err[1].is_ok());
-        });
-    }
-
-
-    #[test]
-    fn deferred_to_promise() {        
-        Deferred::<u32,&str>::new(|| {                        
-            Ok(88u32)
-        }).to_promise().finally_sync(|r| {
-            assert_eq!(r, 88u32);
-        }, |e| {
-            panic!("Error not expected {} ", e);
-        });        
-    }
-
-    #[test]
-    fn deferred_in_series() {        
-        let st = Arc::new(Mutex::new(String::new()));
-
-        let lock1 = st.clone();
-        let d1 = Deferred::<u32, &str>::new(move ||{            
-            thread::sleep_ms(200);            
-            lock1.lock().unwrap().push_str("Def1");
-            Ok(1u32)
-        });
-
-        let lock2 = st.clone();
-        let d2 = Deferred::<u32, &str>::new(move || {
-            thread::sleep_ms(100);
-            lock2.lock().unwrap().push_str("Def2");            
-            Ok(2u32)
-        });
-
-        let lock3 = st.clone();
-        let d3 = Deferred::<u32, &str>::new(move ||{
-            thread::sleep_ms(200);
-            lock3.lock().unwrap().push_str("Def3");            
-            Ok(3u32)
-        });
-
-        let d4 = Deferred::<u32, &str>::new(|| {
-            Ok(4u32)
-        }).chain(|res| {
-            Ok(res.unwrap() * 3)
-        });
-        let d5 = Deferred::<u32, &str>::new(|| {
-            Err("Error")            
-        });
-        let d6 = Deferred::<u32, &str>::new(|| {
-            Ok(6u32)
-        });
-
-        let r = Deferred::vec_to_promise(vec![d1, d2, d3], ControlFlow::Series)
-            .success(|res| {
-                assert_eq!(vec![1u32,2u32, 3u32], res);
-                Ok(0u32)
-            }).sync();        
-        assert_eq!(r, Ok(0u32));
-        assert_eq!(*st.lock().unwrap(),"Def1Def2Def3");
-
-        Deferred::vec_to_promise(vec![d4,d5,d6], ControlFlow::Series)
-            .finally_sync(|res| {
-                unreachable!("Res: {:?}", res);
-            }, |errors| {
-                assert_eq!(errors.len(), 2);
-                assert_eq!(errors[0], Ok(12u32));
-                assert_eq!(errors[1], Err("Error"));
-            });
-    }
-
-    #[test]
-    fn deferred_in_parallel() {
-        let st = Arc::new(Mutex::new(String::new()));
-
-        let lock1 = st.clone();
-        let d1 = Deferred::<u32, &str>::new(move ||{
-            thread::sleep_ms(200);
-            lock1.lock().unwrap().push_str("Def1");
-            Ok(1u32)
-        });
-        let lock2 = st.clone();
-        let d2 = Deferred::<u32, &str>::new(move || {
-            thread::sleep_ms(300);
-            lock2.lock().unwrap().push_str("Def2");
-            Ok(2u32)
-        });
-        let lock3 = st.clone();
-        let d3 = Deferred::<u32, &str>::new(move ||{
-            thread::sleep_ms(50);
-            lock3.lock().unwrap().push_str("Def3");
-            Ok(3u32)
-        });
-        let d4 = Deferred::<u32, &str>::new(|| {
-            Ok(4u32)
-        });
-        let d5 = Deferred::<u32, &str>::new(|| {
-            Err("Error")            
-        });
-        let d6 = Deferred::<u32, &str>::new(|| {
-            Ok(6u32)
-        });
-
-        let r = Deferred::vec_to_promise(vec![d1, d2, d3], ControlFlow::Parallel)
-            .success(|res| {
-                assert_eq!(vec![1u32,2u32, 3u32], res);
-                Ok(0u32)
-            }).sync();        
-        assert_eq!(r, Ok(0u32));
-        assert_eq!(*st.lock().unwrap(),"Def3Def1Def2");
-        
-        Deferred::vec_to_promise(vec![d4,d5,d6], ControlFlow::Parallel)
-            .finally_sync(|res| {
-                unreachable!("Res: {:?}", res);
-            }, |errors| {
-                assert_eq!(errors.len(), 3);
-                assert_eq!(errors[0], Ok(4u32));
-                assert_eq!(errors[1], Err("Error"));
-                assert_eq!(errors[2], Ok(6u32));
-            });
-    }    
-
-    #[test]
-    fn deferred_in_parallel_limit() {
-        let st = Arc::new(Mutex::new(String::new()));
-
-        let lock1 = st.clone();
-        let d1 = Deferred::<u32, &str>::new(move ||{
-            thread::sleep_ms(150);
-            lock1.lock().unwrap().push_str("Def1");
-            Ok(1u32)
-        });
-        let lock2 = st.clone();
-        let d2 = Deferred::<u32, &str>::new(move || {
-            thread::sleep_ms(300);
-            lock2.lock().unwrap().push_str("Def2");
-            Ok(2u32)
-        });
-        let lock3 = st.clone();
-        let d3 = Deferred::<u32, &str>::new(move ||{
-            thread::sleep_ms(50);
-            lock3.lock().unwrap().push_str("Def3");
-            Ok(3u32)
-        });
-        let lock4 = st.clone();
-        let d4 = Deferred::<u32, &str>::new(move || {
-            thread::sleep_ms(200);
-            lock4.lock().unwrap().push_str("Def4");
-            Ok(4u32)
-        });
-        
-        let d5 = Deferred::<u32, &str>::new(|| {    
-            Ok(5u32)
-        });
-        let d6 = Deferred::<u32, &str>::new(|| {    
-            Err("Error d")
-        });
-
-        let r = Deferred::vec_to_promise(vec![d1, d2, d3, d4], ControlFlow::ParallelLimit(2))
-            .success(|res| {
-                assert_eq!(vec![1u32,2u32, 3u32,4u32], res);
-                Ok(0u32)
-            }).sync();        
-        assert_eq!(r, Ok(0u32));
-        assert_eq!(*st.lock().unwrap(),"Def1Def3Def2Def4");
-        
-        Deferred::vec_to_promise(vec![d5,d6], ControlFlow::ParallelLimit(1))
-            .finally_sync(|res| {
-                unreachable!("Res: {:?}", res);
-            }, |errors| {
-                assert_eq!(errors.len(), 2);
-                assert_eq!(errors[0], Ok(5u32));
-                assert_eq!(errors[1], Err("Error d"));
-            });
-    }        
-
-    #[test]
-    fn deferred_in_parallel_limit_cpus() {    
-        let mut vec = Vec::new();
-        for i in 1..5 {
-            vec.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));         
-        }
-        Deferred::vec_to_promise(vec, ControlFlow::ParallelCPUS)
-            .finally_sync(|res| {
-                assert_eq!(res, vec![1u32, 2u32, 3u32, 4u32]);
-            }, |err| {
-                unreachable!("{:?}", err);
-            });
-    }
-
-    #[test]
-    fn deferred_first_wait() {
-        let mut v = vec![];
-        for i in 0..20 {
-            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
-        }
-        let _ = Deferred::first_to_promise(2, true, v, ControlFlow::Series)
-            .finally_sync(|res| {                               
-                assert_eq!(res.len(), 2);                
-            }, |err| {
-                unreachable!("{:?}", err);
-            });
-
-        let mut v = vec![];
-        for i in 0..20 {
-            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
-        }
-        let _ = Deferred::first_to_promise(5, true, v, ControlFlow::ParallelLimit(3))
-            .finally_sync(|res| {               
-                assert!(res.len()>=5 && res.len()<=7);                
-            }, |err| {
-                unreachable!("{:?}", err);
-            });
-
-        let mut v = vec![];
-        for i in 0..20 {
-            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
-        }
-        let _ = Deferred::first_to_promise(5, true, v, ControlFlow::Parallel)
-            .finally_sync(|res| {               
-                assert_eq!(res.len(), 20);                
-            }, |err| {
-                unreachable!("{:?}", err);
-            });
-
-        let mut v = vec![];
-        for i in 0..5 {
-            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
-        }
-        v.push(Deferred::<u32, &str>::new(move ||{ Err("Error in the middle") }));
-        for i in 6..20 {
-            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
-        }
-        let _ = Deferred::first_to_promise(10, true, v, ControlFlow::Parallel)
-            .finally_sync(|res| {                                           
-                assert_eq!(res.len(), 19);                   
-            }, |err| {
-                unreachable!("{:?}", err);                             
-            });  
-
-        let mut v = vec![];
-        for i in 0..5 {
-            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
-        }
-        for _ in 5..10 {
-            v.push(Deferred::<u32, &str>::new(move ||{ Err("Error") }));
-        }
-        let _ = Deferred::first_to_promise(7, true, v, ControlFlow::ParallelLimit(3))
-            .finally_sync(|res| {                                           
-                unreachable!("{:?}", res);                                                              
-            }, |err| {
-                assert_eq!(err.len(), 10);  
-            });  
-
-        let mut v = vec![];
-        for i in 0..5 {
-            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
-        }
-        let _ = Deferred::first_to_promise(7, true, v, ControlFlow::ParallelLimit(3))
-            .finally_sync(|res| {                                           
-                unreachable!("{:?}", res);                                                              
-            }, |err| {
-                assert_eq!(err.len(), 5);  
-            });              
-    }                
-
-    #[test]
-    fn deferred_first_no_wait() {
-        let mut v = vec![];
-        for i in 0..20 {
-            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
-        }
-        let _ = Deferred::first_to_promise(2, false, v, ControlFlow::Series)
-            .finally_sync(|res| {                               
-                assert_eq!(res.len(), 2);                
-            }, |err| {
-                unreachable!("{:?}", err);
-            });
-
-        let mut v = vec![];
-        for i in 0..20 {
-            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
-        }
-        let _ = Deferred::first_to_promise(5, false, v, ControlFlow::ParallelLimit(3))
-            .finally_sync(|res| {               
-                assert_eq!(res.len(), 5);                
-            }, |err| {
-                unreachable!("{:?}", err);
-            });
-
-        let mut v = vec![];
-        for i in 0..20 {
-            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
-        }
-        let _ = Deferred::first_to_promise(5, false, v, ControlFlow::Parallel)
-            .finally_sync(|res| {               
-                assert_eq!(res.len(), 5);                
-            }, |err| {
-                unreachable!("{:?}", err);
-            });
-
-        let mut v = vec![];
-        for i in 0..5 {
-            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
-        }
-        v.push(Deferred::<u32, &str>::new(move ||{ Err("Error in the middle") }));
-        for i in 6..20 {
-            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
-        }
-        let _ = Deferred::first_to_promise(10, false, v, ControlFlow::ParallelLimit(3))
-            .finally_sync(|res| {                                           
-                assert_eq!(res.len(), 10); 
-            }, |err| {
-                unreachable!("{:?}", err);                                               
-            }); 
-
-        let mut v = vec![];
-        for i in 0..5 {
-            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
-        }
-        for _ in 5..10 {
-            v.push(Deferred::<u32, &str>::new(move ||{ Err("Error") }));
-        }
-        let _ = Deferred::first_to_promise(7, false,  v, ControlFlow::ParallelLimit(3))
-            .finally_sync(|res| {                                           
-                unreachable!("{:?}", res);                                                              
-            }, |err| {
-                assert_eq!(err.len(), 10);  
-            }); 
-
-        let mut v = vec![];
-        for i in 0..5 {
-            v.push(Deferred::<u32, &str>::new(move ||{ Ok(i) }));
-        }
-        let _ = Deferred::first_to_promise(7, false, v, ControlFlow::ParallelLimit(3))
-            .finally_sync(|res| {                                           
-                unreachable!("{:?}", res);                                                              
-            }, |err| {
-                assert_eq!(err.len(), 5);  
-            });                          
-    }                    
-
-    #[test]
-    fn deferred_chained() {
-        let res = Deferred::<String, &str>::new(||{
-            thread::sleep_ms(50);
-            if true { Ok("first".to_string()) } else { Err("Nothing") }
-        }).chain(|res| {  
-            let mut v = res.unwrap();      
-            assert_eq!(v, "first");
-            thread::sleep_ms(50);
-            if true { 
-                v.push_str("second"); 
-                Ok(v)
-            } else { 
-                Err("Nothing") 
-            }
-        }).to_promise().sync().unwrap();
-        assert_eq!(res, "firstsecond");
-    }
-
-    #[test]
-    fn nested_promises() {
-        let res = Promise::<_,&str>::new(|| {            
-            // Do nothing
-            Promise::new(|| {
-                Promise::new(|| {
-                    Ok(4)
-                }).success(|res| {
-                    Ok(res + 2)
-                }).sync()
-            }).success(|res| {
-                Ok(res * 7)
-            }).sync()
-        }).success(|res| {
-            Ok(res + 5)
-        }).sync().unwrap();
-        assert_eq!(res, 47);
-    }
-
-    #[test]
-    fn event_loop_1() {
-        let event_loop = EventLoop::new();
-        assert_eq!(event_loop.emit("EventA"), Ok(()));
-        assert_eq!(event_loop.emit("EventB"), Ok(()));
-        assert_eq!(event_loop.emit("EventC"), Ok(()));
-        let res = event_loop.finish().to_promise().sync().unwrap();
-        assert_eq!(res, vec!["EventA", "EventB", "EventC"]);
-    }
-
-    #[test]
-    fn event_loop_2() {
-        let event_loop = EventLoop::new().finish_in_ms(50);
-        assert_eq!(event_loop.emit("EventA"), Ok(()));
-        assert_eq!(event_loop.emit("EventB"), Ok(()));
-        thread::sleep_ms(100);
-        assert_eq!(event_loop.emit("EventC"), Err("EventC"));
-        let res = event_loop.finish().to_promise().sync().unwrap();
-        assert_eq!(res, vec!["EventA", "EventB"]);
-    }    
-
-    #[test]
-    fn event_loop_3() {
-        let event_loop = EventLoop::new();
-        assert_eq!(event_loop.emit("EventA"), Ok(()));
-        assert_eq!(event_loop.emit("EventB"), Ok(()));
-        let event_loop = event_loop.finish();
-        assert_eq!(event_loop.emit("EventC"), Err("EventC"));
-        assert_eq!(event_loop.is_active(), false);
-        let res = event_loop.to_promise().sync().unwrap();
-        assert_eq!(res, vec!["EventA", "EventB"]);
-    }        
-
-    #[test]
-    fn event_loop_4() {
-        let event_loop = EventLoop::new().finish_in_ms(450);
-        assert_eq!(event_loop.emit("EventA"), Ok(()));        
-        assert_eq!(event_loop.emit("EventB"), Ok(()));
-        let x = Arc::new(Mutex::new(0));
-        event_loop.emit_until(move || {
-            thread::sleep_ms(100);
-            let mut lock_x = x.lock().unwrap(); *lock_x += 1;
-            if *lock_x == 2 { return Emit::Continue }
-            if *lock_x <= 5 { Emit::Event("EventC") } else { Emit::Stop }
-        });
-        let res = event_loop.to_promise().sync().unwrap();
-        assert_eq!(res, vec!["EventA", "EventB", "EventC", "EventC", "EventC"]);
-    }     
-
-    #[test]
-    fn event_loop_on_1() {
-        let v = Arc::new(Mutex::new(Vec::<&str>::new()));
-        let v_cloned = v.clone();
-        let event_loop = EventLoop::on(move |event| {
-            match event {
-                "EventA" => { let mut v_lock = v_cloned.lock().unwrap(); v_lock.push("EventATreated"); },
-                "EventB" => (),
-                _ => { let mut v_lock = v_cloned.lock().unwrap(); v_lock.push("EventOtherTreated"); },
-            }
-        });
-        assert_eq!(event_loop.emit("EventA"), Ok(()));
-        assert_eq!(event_loop.emit("EventB"), Ok(()));
-        assert_eq!(event_loop.emit("EventC"), Ok(()));
-        let res = event_loop.finish().to_promise().sync().unwrap();
-        assert_eq!(res.len(), 0);
-    }
-
-    #[test]
-    fn event_loop_on_2() {
-        enum Event {
-            Hello(String),
-            Goodbye(String)
-        }
-        let v = Arc::new(Mutex::new(Vec::<String>::new()));
-        let v_cloned = v.clone();
-        let event_loop = EventLoop::on(move |event| {
-            match event {
-                Event::Hello(_) => (),
-                Event::Goodbye(v) => { let mut v_lock = v_cloned.lock().unwrap(); v_lock.push(v); },
-            }
-        }).finish_in_ms(100);
-        assert!(event_loop.emit(Event::Hello("World".to_string())).is_ok());
-        assert!(event_loop.emit(Event::Goodbye("BCN".to_string())).is_ok());
-        assert!(event_loop.emit(Event::Goodbye("MAD".to_string())).is_ok());
-        let res = event_loop.to_promise().sync().unwrap();
-        assert_eq!(res.len(), 0);
-    }    
-
-    #[test]
-    fn event_loop_on_managed_1() {
-        let event_loop = EventLoop::on_managed(|event| {
-            match event {
-                "EventA" => Emit::Event("EventATreated"),
-                "EventB" => Emit::Continue,
-                "EventStop" => Emit::Stop,
-                _ => Emit::Event("EventOtherTreated")
-            }
-        });
-        assert_eq!(event_loop.emit("EventA"), Ok(()));
-        assert_eq!(event_loop.emit("EventB"), Ok(()));
-        assert_eq!(event_loop.emit("EventC"), Ok(()));
-        assert_eq!(event_loop.emit("EventStop"), Ok(()));
-        thread::sleep_ms(75);
-        assert_eq!(event_loop.emit("EventE"), Err("EventE"));
-        let res = event_loop.finish().to_promise().sync().unwrap();
-        assert_eq!(res, vec!["EventATreated", "EventOtherTreated"]);
-    }
-
-    #[test]
-    fn event_loop_on_managed_2() {
-        enum Event {
-            Hello(String),
-            Goodbye(String)
-        }
-        let event_loop = EventLoop::on_managed(|event| {
-            match event {
-                Event::Hello(_) => Emit::Continue,
-                Event::Goodbye(v) => Emit::Event(Event::Goodbye(v)),
-            }
-        }).finish_in_ms(100);
-        assert!(event_loop.emit(Event::Hello("World".to_string())).is_ok());
-        assert!(event_loop.emit(Event::Goodbye("BCN".to_string())).is_ok());
-        assert!(event_loop.emit(Event::Goodbye("MAD".to_string())).is_ok());
-        let res = event_loop.to_promise().sync().unwrap();
-        assert_eq!(res.len(), 2);
-        match res[0] { Event::Goodbye(ref v) => assert_eq!(v, "BCN") , _ => panic!() };
-        match res[1] { Event::Goodbye(ref v) => assert_eq!(v, "MAD") , _ => panic!() };
-    }        
 }

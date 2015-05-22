@@ -1,6 +1,6 @@
 [package]
 name = "asynchronous"
-version = "0.4.4"
+version = "0.4.5"
 authors = ["bcndanos <rinnegatobcn@gmail.com>"]
 description = "Promises Q style , async and event loops"
 repository = "https://github.com/bcndanos/asynchronous"
