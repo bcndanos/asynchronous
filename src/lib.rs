@@ -263,6 +263,42 @@ impl<T,E> Deferred<T,E> where T: Send + 'static , E: Send + 'static {
         }        
     }
 
+    /// Executes one function with the result of the previous deferred.
+    /// It doesn't return anything and it's completly asynchronous.
+    ///
+    /// ```rust
+    /// asynchronous::Deferred::new(|| {
+    ///    std::thread::sleep_ms(100);
+    ///    if true { Ok(32) } else { Err("Error txt") }
+    /// }).finally(|res| { 
+    ///    assert_eq!(res.unwrap(), 32);
+    /// });
+    ///
+    /// let a = 2 + 3;  // This line is executed before the above Promise
+    /// 
+    /// ```   
+    pub fn finally<F>(self, f:F) where F: Send + 'static + FnOnce(Result<T,E>) {
+        self.to_promise().finally(f);
+    }       
+
+    /// Executes one function with the result of the previous deferred.
+    /// It doesn't return anything, but it's synchronized with the caller
+    ///
+    /// ```rust
+    /// use asynchronous::Promise;
+    /// 
+    /// Promise::new(|| {
+    ///    std::thread::sleep_ms(100);
+    ///    if true { Ok(32) } else { Err("Error txt") }
+    /// }).finally_sync(|res| { 
+    ///    assert_eq!(res.unwrap(), 32);
+    /// });    
+    ///
+    /// let a = 2 + 3;  // This line is executed after the above Promise
+    pub fn finally_sync<F>(self, f:F) where F: Send + 'static + FnOnce(Result<T,E>) {
+        self.to_promise().finally_sync(f);
+    }           
+
     /// Executes the task stored and returns a Promise
     ///
     /// ```rust

@@ -63,6 +63,33 @@ fn promises_parallel() {
     });
 }
 
+#[test]
+fn deferred() {     
+    for x in 0..10 {
+        let deferred = Deferred::<u32,&str>::new(move || { 
+            match x {
+                0 => Err("Division by zero"),
+                _ => Ok(x * 2)
+            }
+        }).success(move |res| {
+            assert_eq!(res, x * 2);
+            Ok(res * 2) 
+        }).fail(|error| {
+            assert_eq!(error, "Division by zero");
+            Err(error)
+        }) ;
+
+        let result = deferred.sync();
+
+        match x {
+            0 => assert!(result.is_err()),
+            _ => {
+                assert!(result.is_ok());
+                assert_eq!(result.unwrap(), x * 4);
+            }
+        }
+    }
+}
 
 #[test]
 fn deferred_to_promise() {        
@@ -386,7 +413,7 @@ fn deferred_first_no_wait() {
 
 #[test]
 fn deferred_chained() {
-    let res = Deferred::<String, &str>::new(||{
+    Deferred::<String, &str>::new(||{
         thread::sleep_ms(50);
         if true { Ok("first".to_string()) } else { Err("Nothing") }
     }).chain(|res| {  
@@ -399,8 +426,9 @@ fn deferred_chained() {
         } else { 
             Err("Nothing") 
         }
-    }).to_promise().sync().unwrap();
-    assert_eq!(res, "firstsecond");
+    }).finally_sync(|res| {
+        assert_eq!(res.unwrap(), "firstsecond");
+    });
 }
 
 #[test]
