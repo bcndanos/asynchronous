@@ -48,12 +48,9 @@ Promise::new(|| {
   assert_eq!(res, 10.0 / 3.0);
   let res_int = res as u32 * 2;
   Ok(res_int)
-}).finally_sync(|res| {       // res has type u32
-  // Catch a correct result
-  assert_eq!(res, 6u32);
-}, |error| {
-  // Catch an incorrect result
-  unreachable!();
+}).finally_sync(|res| {       // res has type Result<u32,&str>
+  // Executed always at the end
+  assert_eq!(res.unwrap(), 6u32);
 });
 ``` 
 
@@ -86,11 +83,9 @@ promise.success(|res| {
     // Catch the error and execute another Promise
     assert_eq!(error, vec![Ok(1u32), Err("Mock Error"), Ok(3u32)]);    
     Deferred::vec_to_promise(vec![d4,d5], ControlFlow::Series).sync()
-}).finally_sync(|res| {   // res : Vec<u32>
+}).finally_sync(|res| {   // res : Result<Vec<u32>,&str>
     // Do something here    
-    assert_eq!(res, vec![4u32, 5u32]);
-}, |error| {              // error : Vec<Result<u32,&str>>
-    // Check Errors
+    assert_eq!(res.unwrap(), vec![4u32, 5u32]);
 });
 
 ``` 
@@ -104,9 +99,7 @@ let el = EventLoop::new().finish_in_ms(100);
 el.emit("Event1");
 el.emit("Event2");
 // Do something here
-el.to_promise().finally_sync(|res| {  // res: Vec<Ev>
-    assert_eq!(res, vec!["Event1", "Event2"]);
-}, |error| {
-    // Check Errors
+el.to_promise().finally_sync(|res| {  // res: Result<Vec<Ev>,()>
+    assert_eq!(res.unwrap(), vec!["Event1", "Event2"]);
 });
 ``` 
