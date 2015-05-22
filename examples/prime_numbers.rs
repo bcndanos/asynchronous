@@ -129,7 +129,7 @@ fn main() {
                 }, |err| {
                     println!("There was an error submitting a job!");
                     Err(err)
-                }).finally_wrap(|_| { 
+                }).finally(|_| { 
                     show_command_line();   
                 }); 
             },
@@ -172,7 +172,7 @@ fn main() {
         Emit::Continue
     });
 
-    let _ = el.to_promise().finally_wrap_sync(|_| {
+    let _ = el.to_promise().finally_sync(|_| {
         println!("Goodbye!");
     });
 }
@@ -236,7 +236,7 @@ fn submit_job(jobs:Arc<Mutex<Jobs>>, duration:Option<u32>) -> Promise<usize,Stri
         execute_job(jobs.clone(), new_id, event_loop_job.get_handler());
 
         let jobs_cloned = jobs.clone();
-        event_loop_job.to_promise().finally_wrap(move |_| {
+        event_loop_job.to_promise().finally(move |_| {
             let mut lock = jobs_cloned.lock().unwrap();
             lock.stop(new_id);
             let st = format!("Job {} ended!", new_id);
