@@ -42,8 +42,10 @@
 
     <section id='main' class="content mod">
 <h1 class='fqn'><span class='in-band'>Crate <a class='mod' href=''>asynchronous</a></span><span class='out-of-band'><span id='render-detail'>
-            <a id="toggle-all-docs" href="#" title="collapse all docs">[&minus;]</a>
-        </span><a id='src-0' class='srclink' href='../src/asynchronous/lib.rs.html#1-1527' title='goto source code'>[src]</a></span></h1>
+            <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                [<span class='inner'>&#x2212;</span>]
+            </a>
+        </span><a id='src-0' class='srclink' href='../src/asynchronous/lib.rs.html#1-1067' title='goto source code'>[src]</a></span></h1>
 <div class='docblock'><p>A <strong>promise</strong> based asynchronous library</p>
 
 <p>This library provides an usefull way to invoke functions (clousures) in a <strong>Promise Style</strong> using separated threads. A Promise 
@@ -82,7 +84,7 @@ except according to those terms.</p>
   <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='number'>10.0</span> <span class='op'>/</span> <span class='number'>3.0</span>);
   <span class='kw'>let</span> <span class='ident'>res_int</span> <span class='op'>=</span> <span class='ident'>res</span> <span class='kw'>as</span> <span class='ident'>u32</span> <span class='op'>*</span> <span class='number'>2</span>;
   <span class='prelude-val'>Ok</span>(<span class='ident'>res_int</span>)
-}).<span class='ident'>finally_sync_wrap</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {       <span class='comment'>// res has type Result&lt;u32,&amp;str&gt;</span>
+}).<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {       <span class='comment'>// res has type Result&lt;u32,&amp;str&gt;</span>
   <span class='comment'>// Executed always at the end</span>
   <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>.<span class='ident'>unwrap</span>(), <span class='number'>6u32</span>);
 });
@@ -116,11 +118,9 @@ except according to those terms.</p>
     <span class='comment'>// Catch the error and execute another Promise</span>
     <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>error</span>, <span class='macro'>vec</span><span class='macro'>!</span>[<span class='prelude-val'>Ok</span>(<span class='number'>1u32</span>), <span class='prelude-val'>Err</span>(<span class='string'>&quot;Mock Error&quot;</span>), <span class='prelude-val'>Ok</span>(<span class='number'>3u32</span>)]);    
     <span class='ident'>Deferred</span>::<span class='ident'>vec_to_promise</span>(<span class='macro'>vec</span><span class='macro'>!</span>[<span class='ident'>d4</span>,<span class='ident'>d5</span>], <span class='ident'>ControlFlow</span>::<span class='ident'>Series</span>).<span class='ident'>sync</span>()
-}).<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {   <span class='comment'>// res : Vec&lt;u32&gt;</span>
+}).<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {   <span class='comment'>// res : Result&lt;Vec&lt;u32&gt;,&amp;str&gt;</span>
     <span class='comment'>// Do something here    </span>
-    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='macro'>vec</span><span class='macro'>!</span>[<span class='number'>4u32</span>, <span class='number'>5u32</span>]);
-}, <span class='op'>|</span><span class='ident'>error</span><span class='op'>|</span> {              <span class='comment'>// error : Vec&lt;Result&lt;u32,&amp;str&gt;&gt;</span>
-    <span class='comment'>// Check Errors</span>
+    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>.<span class='ident'>unwrap</span>(), <span class='macro'>vec</span><span class='macro'>!</span>[<span class='number'>4u32</span>, <span class='number'>5u32</span>]);
 });
 </pre>
 
@@ -132,10 +132,8 @@ except according to those terms.</p>
 <span class='ident'>el</span>.<span class='ident'>emit</span>(<span class='string'>&quot;Event1&quot;</span>);
 <span class='ident'>el</span>.<span class='ident'>emit</span>(<span class='string'>&quot;Event2&quot;</span>);
 <span class='comment'>// Do something here</span>
-<span class='ident'>el</span>.<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Vec&lt;Ev&gt;</span>
-    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='macro'>vec</span><span class='macro'>!</span>[<span class='string'>&quot;Event1&quot;</span>, <span class='string'>&quot;Event2&quot;</span>]);
-}, <span class='op'>|</span><span class='ident'>error</span><span class='op'>|</span> {
-    <span class='comment'>// Check Errors</span>
+<span class='ident'>el</span>.<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Result&lt;Vec&lt;Ev&gt;,()&gt;</span>
+    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>.<span class='ident'>unwrap</span>(), <span class='macro'>vec</span><span class='macro'>!</span>[<span class='string'>&quot;Event1&quot;</span>, <span class='string'>&quot;Event2&quot;</span>]);
 });
 </pre>
 </div><h2 id='structs' class='section-header'><a href="#structs">Structs</a></h2>
@@ -230,6 +228,10 @@ E : Type of error returned</p>
                 <code>struct</code>, <code>enum</code>,
                 <code>trait</code>, <code>typedef</code> (or
                 <code>tdef</code>).
+            </p>
+            <p>
+                Search functions by type signature (e.g.
+                <code>vec -> usize</code>)
             </p>
         </div>
     </div>

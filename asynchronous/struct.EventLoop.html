@@ -42,8 +42,10 @@
 
     <section id='main' class="content struct">
 <h1 class='fqn'><span class='in-band'>Struct <a href='index.html'>asynchronous</a>::<wbr><a class='struct' href=''>EventLoop</a></span><span class='out-of-band'><span id='render-detail'>
-            <a id="toggle-all-docs" href="#" title="collapse all docs">[&minus;]</a>
-        </span><a id='src-1848' class='srclink' href='../src/asynchronous/lib.rs.html#731-734' title='goto source code'>[src]</a></span></h1>
+            <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                [<span class='inner'>&#x2212;</span>]
+            </a>
+        </span><a id='src-2151' class='srclink' href='../src/asynchronous/lib.rs.html#848-851' title='goto source code'>[src]</a></span></h1>
 <pre class='rust struct'>pub struct EventLoop&lt;Ev&gt; {
     // some fields omitted
 }</pre><div class='docblock'><p>Executes a task in background collecting events from other threads</p>
@@ -56,10 +58,8 @@
 <span class='ident'>el</span>.<span class='ident'>emit</span>(<span class='string'>&quot;Event1&quot;</span>);
 <span class='ident'>el</span>.<span class='ident'>emit</span>(<span class='string'>&quot;Event2&quot;</span>);
 <span class='comment'>// Do something here</span>
-<span class='ident'>el</span>.<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Vec&lt;Ev&gt;</span>
-    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='macro'>vec</span><span class='macro'>!</span>[<span class='string'>&quot;Event1&quot;</span>, <span class='string'>&quot;Event2&quot;</span>]);
-}, <span class='op'>|</span><span class='ident'>error</span><span class='op'>|</span> {
-    <span class='comment'>// Check Errors</span>
+<span class='ident'>el</span>.<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Result&lt;Vec&lt;Ev&gt;,()&gt;</span>
+    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>.<span class='ident'>unwrap</span>(), <span class='macro'>vec</span><span class='macro'>!</span>[<span class='string'>&quot;Event1&quot;</span>, <span class='string'>&quot;Event2&quot;</span>]);
 });
 </pre>
 </div><h4 id='method.on' class='method'><code>fn <a href='#method.on' class='fnname'>on</a>&lt;F&gt;(f: F) -&gt; <a class='struct' href='../asynchronous/struct.EventLoop.html' title='asynchronous::EventLoop'>EventLoop</a>&lt;Ev&gt; <span class='where'>where F: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static + <a class='trait' href='http://doc.rust-lang.org/nightly/core/ops/trait.Fn.html' title='core::ops::Fn'>Fn</a>(Ev)</span></code></h4>
@@ -77,10 +77,8 @@
 <span class='ident'>el</span>.<span class='ident'>emit</span>(<span class='ident'>MiEvents</span>::<span class='ident'>Hello</span>(<span class='string'>&quot;World&quot;</span>.<span class='ident'>to_string</span>()));
 <span class='ident'>el</span>.<span class='ident'>emit</span>(<span class='ident'>MiEvents</span>::<span class='ident'>Goodbye</span>(<span class='number'>3</span>));
 <span class='comment'>// Do something here</span>
-<span class='ident'>el</span>.<span class='ident'>finish</span>().<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Vec&lt;Ev&gt;</span>
-    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>.<span class='ident'>len</span>(), <span class='number'>0</span>);
-}, <span class='op'>|</span><span class='ident'>error</span><span class='op'>|</span> {
-    <span class='comment'>// Check Errors</span>
+<span class='ident'>el</span>.<span class='ident'>finish</span>().<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Result&lt;Vec&lt;Ev&gt;,()&gt;</span>
+    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>.<span class='ident'>unwrap</span>().<span class='ident'>len</span>(), <span class='number'>0</span>);
 });
 </pre>
 </div><h4 id='method.on_managed' class='method'><code>fn <a href='#method.on_managed' class='fnname'>on_managed</a>&lt;F&gt;(f: F) -&gt; <a class='struct' href='../asynchronous/struct.EventLoop.html' title='asynchronous::EventLoop'>EventLoop</a>&lt;Ev&gt; <span class='where'>where F: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static + <a class='trait' href='http://doc.rust-lang.org/nightly/core/ops/trait.Fn.html' title='core::ops::Fn'>Fn</a>(Ev) -&gt; <a class='enum' href='../asynchronous/enum.Emit.html' title='asynchronous::Emit'>Emit</a>&lt;Ev&gt;</span></code></h4>
@@ -98,11 +96,10 @@
 <span class='ident'>el</span>.<span class='ident'>emit</span>(<span class='ident'>MiEvents</span>::<span class='ident'>Hello</span>(<span class='string'>&quot;World&quot;</span>.<span class='ident'>to_string</span>()));
 <span class='ident'>el</span>.<span class='ident'>emit</span>(<span class='ident'>MiEvents</span>::<span class='ident'>Goodbye</span>(<span class='number'>555</span>));
 <span class='comment'>// Do something here</span>
-<span class='ident'>el</span>.<span class='ident'>finish</span>().<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Vec&lt;Ev&gt;</span>
-    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>.<span class='ident'>len</span>(), <span class='number'>1</span>);
-    <span class='kw'>match</span> <span class='ident'>res</span>[<span class='number'>0</span>] { <span class='ident'>MiEvents</span>::<span class='ident'>Goodbye</span>(<span class='ident'>v</span>) <span class='op'>=&gt;</span> <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>v</span>, <span class='number'>555</span>), _<span class='op'>=&gt;</span> () };
-}, <span class='op'>|</span><span class='ident'>error</span><span class='op'>|</span> {
-    <span class='comment'>// Check Errors</span>
+<span class='ident'>el</span>.<span class='ident'>finish</span>().<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Result&lt;Vec&lt;Ev&gt;,()&gt;</span>
+    <span class='kw'>let</span> <span class='ident'>vec_res</span> <span class='op'>=</span> <span class='ident'>res</span>.<span class='ident'>unwrap</span>();
+    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>vec_res</span>.<span class='ident'>len</span>(), <span class='number'>1</span>);
+    <span class='kw'>match</span> <span class='ident'>vec_res</span>[<span class='number'>0</span>] { <span class='ident'>MiEvents</span>::<span class='ident'>Goodbye</span>(<span class='ident'>vec_res</span>) <span class='op'>=&gt;</span> <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>vec_res</span>, <span class='number'>555</span>), _<span class='op'>=&gt;</span> () };
 });
 </pre>
 </div><h4 id='method.emit' class='method'><code>fn <a href='#method.emit' class='fnname'>emit</a>(&amp;self, event: Ev) -&gt; <a class='enum' href='http://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;<a href='http://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>, Ev&gt;</code></h4>
@@ -119,10 +116,8 @@
    <span class='kw'>if</span> <span class='op'>*</span><span class='ident'>lock_x</span> <span class='op'>&lt;=</span> <span class='number'>3</span> { <span class='ident'>Emit</span>::<span class='ident'>Event</span>(<span class='string'>&quot;Event Test&quot;</span>) } <span class='kw'>else</span> { <span class='ident'>Emit</span>::<span class='ident'>Stop</span> }
 });    
 <span class='comment'>// Do something here</span>
-<span class='ident'>el</span>.<span class='ident'>finish_in_ms</span>(<span class='number'>100</span>).<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Vec&lt;Ev&gt;</span>
-    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='macro'>vec</span><span class='macro'>!</span>[<span class='string'>&quot;Event Test&quot;</span>, <span class='string'>&quot;Event Test&quot;</span>, <span class='string'>&quot;Event Test&quot;</span>]);
-}, <span class='op'>|</span><span class='ident'>error</span><span class='op'>|</span> {
-    <span class='comment'>// Check Errors</span>
+<span class='ident'>el</span>.<span class='ident'>finish_in_ms</span>(<span class='number'>100</span>).<span class='ident'>to_promise</span>().<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {  <span class='comment'>// res: Result&lt;Vec&lt;Ev&gt;,()&gt;</span>
+    <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>.<span class='ident'>unwrap</span>(), <span class='macro'>vec</span><span class='macro'>!</span>[<span class='string'>&quot;Event Test&quot;</span>, <span class='string'>&quot;Event Test&quot;</span>, <span class='string'>&quot;Event Test&quot;</span>]);
 });
 </pre>
 </div><h4 id='method.finish' class='method'><code>fn <a href='#method.finish' class='fnname'>finish</a>(self) -&gt; <a class='struct' href='../asynchronous/struct.EventLoop.html' title='asynchronous::EventLoop'>EventLoop</a>&lt;Ev&gt;</code></h4>
@@ -167,6 +162,10 @@
                 <code>struct</code>, <code>enum</code>,
                 <code>trait</code>, <code>typedef</code> (or
                 <code>tdef</code>).
+            </p>
+            <p>
+                Search functions by type signature (e.g.
+                <code>vec -> usize</code>)
             </p>
         </div>
     </div>

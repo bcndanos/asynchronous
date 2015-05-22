@@ -42,8 +42,10 @@
 
     <section id='main' class="content struct">
 <h1 class='fqn'><span class='in-band'>Struct <a href='index.html'>asynchronous</a>::<wbr><a class='struct' href=''>Promise</a></span><span class='out-of-band'><span id='render-detail'>
-            <a id="toggle-all-docs" href="#" title="collapse all docs">[&minus;]</a>
-        </span><a id='src-975' class='srclink' href='../src/asynchronous/lib.rs.html#354-356' title='goto source code'>[src]</a></span></h1>
+            <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                [<span class='inner'>&#x2212;</span>]
+            </a>
+        </span><a id='src-1367' class='srclink' href='../src/asynchronous/lib.rs.html#527-529' title='goto source code'>[src]</a></span></h1>
 <pre class='rust struct'>pub struct Promise&lt;T, E&gt; {
     // some fields omitted
 }</pre><div class='docblock'><p>Stores a result of previous execution tasks.
@@ -100,6 +102,25 @@ Returns a new Promise</p>
 }).<span class='ident'>sync</span>();
 <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>r</span>, <span class='prelude-val'>Ok</span>(<span class='number'>35</span>));
 </pre>
+</div><h4 id='method.chain' class='method'><code>fn <a href='#method.chain' class='fnname'>chain</a>&lt;TT, EE, F&gt;(self, f: F) -&gt; <a class='struct' href='../asynchronous/struct.Promise.html' title='asynchronous::Promise'>Promise</a>&lt;TT, EE&gt; <span class='where'>where TT: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static, EE: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static, F: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static + <a class='trait' href='http://doc.rust-lang.org/nightly/core/ops/trait.FnOnce.html' title='core::ops::FnOnce'>FnOnce</a>(<a class='enum' href='http://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;T, E&gt;) -&gt; <a class='enum' href='http://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;TT, EE&gt;</span></code></h4>
+<div class='docblock'><p>The same functionality as <strong>then</strong>, but wraps the result in only one function</p>
+<pre id='rust-example-rendered' class='rust '>
+<span class='kw'>let</span> <span class='ident'>r</span> <span class='op'>=</span> <span class='ident'>asynchronous</span>::<span class='ident'>Promise</span>::<span class='ident'>new</span>(<span class='op'>||</span> {
+   <span class='kw'>if</span> <span class='boolval'>false</span> { <span class='prelude-val'>Ok</span>(<span class='number'>1.23</span>) } <span class='kw'>else</span> { <span class='prelude-val'>Err</span>(<span class='string'>&quot;Final error&quot;</span>)}
+}).<span class='ident'>chain</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
+   <span class='comment'>// Do something that executes always even on error</span>
+   <span class='macro'>assert</span><span class='macro'>!</span>(<span class='ident'>res</span>.<span class='ident'>is_err</span>());
+   <span class='ident'>res</span>
+}).<span class='ident'>then</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
+   <span class='macro'>unreachable</span><span class='macro'>!</span>();
+   <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='number'>1.23</span>);
+   <span class='prelude-val'>Ok</span>(<span class='number'>34</span>)
+}, <span class='op'>|</span><span class='ident'>err</span><span class='op'>|</span> {
+   <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>err</span>, <span class='string'>&quot;Final error&quot;</span>);
+   <span class='kw'>if</span> <span class='boolval'>true</span> { <span class='prelude-val'>Ok</span>(<span class='number'>35</span>) } <span class='kw'>else</span> { <span class='prelude-val'>Err</span>(<span class='number'>44u64</span>)}
+}).<span class='ident'>sync</span>();
+<span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>r</span>, <span class='prelude-val'>Ok</span>(<span class='number'>35</span>));
+</pre>
 </div><h4 id='method.success' class='method'><code>fn <a href='#method.success' class='fnname'>success</a>&lt;TT, F&gt;(self, f: F) -&gt; <a class='struct' href='../asynchronous/struct.Promise.html' title='asynchronous::Promise'>Promise</a>&lt;TT, E&gt; <span class='where'>where F: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static + <a class='trait' href='http://doc.rust-lang.org/nightly/core/ops/trait.FnOnce.html' title='core::ops::FnOnce'>FnOnce</a>(T) -&gt; <a class='enum' href='http://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;TT, E&gt;, TT: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static</span></code></h4>
 <div class='docblock'><p>Executes a new task if the result of the previous promise is Ok. It may return a new type in a correct result (Ok),
 but it must return the same type of error of its previous promise.</p>
@@ -128,25 +149,22 @@ but it must return the same type of error of its previous promise.</p>
    <span class='prelude-val'>Ok</span>(<span class='string'>&quot;Value Ok&quot;</span>)
 }).<span class='ident'>sync</span>();
 </pre>
-</div><h4 id='method.finally' class='method'><code>fn <a href='#method.finally' class='fnname'>finally</a>&lt;FT, FE&gt;(self, ft: FT, fe: FE) <span class='where'>where FT: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static + <a class='trait' href='http://doc.rust-lang.org/nightly/core/ops/trait.FnOnce.html' title='core::ops::FnOnce'>FnOnce</a>(T), FE: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static + <a class='trait' href='http://doc.rust-lang.org/nightly/core/ops/trait.FnOnce.html' title='core::ops::FnOnce'>FnOnce</a>(E)</span></code></h4>
-<div class='docblock'><p>Executes only one of the two functions received depending on the result of the previous promise (Ok or Err).
+</div><h4 id='method.finally' class='method'><code>fn <a href='#method.finally' class='fnname'>finally</a>&lt;F&gt;(self, f: F) <span class='where'>where F: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static + <a class='trait' href='http://doc.rust-lang.org/nightly/core/ops/trait.FnOnce.html' title='core::ops::FnOnce'>FnOnce</a>(<a class='enum' href='http://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;T, E&gt;)</span></code></h4>
+<div class='docblock'><p>Executes one function with the result of the previous promise.
 It doesn&#39;t return anything and it&#39;s completly asynchronous.</p>
 <pre id='rust-example-rendered' class='rust '>
 <span class='ident'>asynchronous</span>::<span class='ident'>Promise</span>::<span class='ident'>new</span>(<span class='op'>||</span> {
    <span class='ident'>std</span>::<span class='ident'>thread</span>::<span class='ident'>sleep_ms</span>(<span class='number'>100</span>);
    <span class='kw'>if</span> <span class='boolval'>true</span> { <span class='prelude-val'>Ok</span>(<span class='number'>32</span>) } <span class='kw'>else</span> { <span class='prelude-val'>Err</span>(<span class='string'>&quot;Error txt&quot;</span>) }
 }).<span class='ident'>finally</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> { 
-   <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='number'>32</span>);
-}, <span class='op'>|</span><span class='ident'>err</span><span class='op'>|</span>{
-   <span class='macro'>unreachable</span><span class='macro'>!</span>();        
-   <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>err</span>, <span class='string'>&quot;Error txt&quot;</span>);
+   <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>.<span class='ident'>unwrap</span>(), <span class='number'>32</span>);
 });
 
 <span class='kw'>let</span> <span class='ident'>a</span> <span class='op'>=</span> <span class='number'>2</span> <span class='op'>+</span> <span class='number'>3</span>;  <span class='comment'>// This line is executed before the above Promise</span>
  
 </pre>
-</div><h4 id='method.finally_sync' class='method'><code>fn <a href='#method.finally_sync' class='fnname'>finally_sync</a>&lt;FT, FE&gt;(self, ft: FT, fe: FE) <span class='where'>where FT: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static + <a class='trait' href='http://doc.rust-lang.org/nightly/core/ops/trait.FnOnce.html' title='core::ops::FnOnce'>FnOnce</a>(T), FE: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static + <a class='trait' href='http://doc.rust-lang.org/nightly/core/ops/trait.FnOnce.html' title='core::ops::FnOnce'>FnOnce</a>(E)</span></code></h4>
-<div class='docblock'><p>Executes only one of the two functions received depending on the result of the previous promise (Ok or Err).
+</div><h4 id='method.finally_sync' class='method'><code>fn <a href='#method.finally_sync' class='fnname'>finally_sync</a>&lt;F&gt;(self, f: F) <span class='where'>where F: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static + <a class='trait' href='http://doc.rust-lang.org/nightly/core/ops/trait.FnOnce.html' title='core::ops::FnOnce'>FnOnce</a>(<a class='enum' href='http://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;T, E&gt;)</span></code></h4>
+<div class='docblock'><p>Executes one function with the result of the previous promise.
 It doesn&#39;t return anything, but it&#39;s synchronized with the caller</p>
 <pre id='rust-example-rendered' class='rust '>
 <span class='kw'>use</span> <span class='ident'>asynchronous</span>::<span class='ident'>Promise</span>;
@@ -155,60 +173,10 @@ It doesn&#39;t return anything, but it&#39;s synchronized with the caller</p>
    <span class='ident'>std</span>::<span class='ident'>thread</span>::<span class='ident'>sleep_ms</span>(<span class='number'>100</span>);
    <span class='kw'>if</span> <span class='boolval'>true</span> { <span class='prelude-val'>Ok</span>(<span class='number'>32</span>) } <span class='kw'>else</span> { <span class='prelude-val'>Err</span>(<span class='string'>&quot;Error txt&quot;</span>) }
 }).<span class='ident'>finally_sync</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> { 
-   <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='number'>32</span>);
-}, <span class='op'>|</span><span class='ident'>err</span><span class='op'>|</span>{
-   <span class='macro'>unreachable</span><span class='macro'>!</span>();        
-   <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>err</span>, <span class='string'>&quot;Error txt&quot;</span>);
+   <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>.<span class='ident'>unwrap</span>(), <span class='number'>32</span>);
 });    
 
 <span class='kw'>let</span> <span class='ident'>a</span> <span class='op'>=</span> <span class='number'>2</span> <span class='op'>+</span> <span class='number'>3</span>;  <span class='comment'>// This line is executed after the above Promise</span>
-</pre>
-</div><h4 id='method.then_wrap' class='method'><code>fn <a href='#method.then_wrap' class='fnname'>then_wrap</a>&lt;TT, EE, F&gt;(self, f: F) -&gt; <a class='struct' href='../asynchronous/struct.Promise.html' title='asynchronous::Promise'>Promise</a>&lt;TT, EE&gt; <span class='where'>where TT: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static, EE: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static, F: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static + <a class='trait' href='http://doc.rust-lang.org/nightly/core/ops/trait.FnOnce.html' title='core::ops::FnOnce'>FnOnce</a>(<a class='enum' href='http://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;T, E&gt;) -&gt; <a class='enum' href='http://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;TT, EE&gt;</span></code></h4>
-<div class='docblock'><p>The same functionality as <strong>then</strong>, but wraps the result in only one function</p>
-<pre id='rust-example-rendered' class='rust '>
-<span class='kw'>let</span> <span class='ident'>r</span> <span class='op'>=</span> <span class='ident'>asynchronous</span>::<span class='ident'>Promise</span>::<span class='ident'>new</span>(<span class='op'>||</span> {
-   <span class='kw'>if</span> <span class='boolval'>false</span> { <span class='prelude-val'>Ok</span>(<span class='number'>1.23</span>) } <span class='kw'>else</span> { <span class='prelude-val'>Err</span>(<span class='string'>&quot;Final error&quot;</span>)}
-}).<span class='ident'>then_wrap</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
-   <span class='comment'>// Do something that executes always even on error</span>
-   <span class='macro'>assert</span><span class='macro'>!</span>(<span class='ident'>res</span>.<span class='ident'>is_err</span>());
-   <span class='ident'>res</span>
-}).<span class='ident'>then</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> {
-   <span class='macro'>unreachable</span><span class='macro'>!</span>();
-   <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>, <span class='number'>1.23</span>);
-   <span class='prelude-val'>Ok</span>(<span class='number'>34</span>)
-}, <span class='op'>|</span><span class='ident'>err</span><span class='op'>|</span> {
-   <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>err</span>, <span class='string'>&quot;Final error&quot;</span>);
-   <span class='kw'>if</span> <span class='boolval'>true</span> { <span class='prelude-val'>Ok</span>(<span class='number'>35</span>) } <span class='kw'>else</span> { <span class='prelude-val'>Err</span>(<span class='number'>44u64</span>)}
-}).<span class='ident'>sync</span>();
-<span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>r</span>, <span class='prelude-val'>Ok</span>(<span class='number'>35</span>));
-</pre>
-</div><h4 id='method.finally_wrap' class='method'><code>fn <a href='#method.finally_wrap' class='fnname'>finally_wrap</a>&lt;F&gt;(self, f: F) <span class='where'>where F: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static + <a class='trait' href='http://doc.rust-lang.org/nightly/core/ops/trait.FnOnce.html' title='core::ops::FnOnce'>FnOnce</a>(<a class='enum' href='http://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;T, E&gt;)</span></code></h4>
-<div class='docblock'><p>The same functionality as <strong>finally</strong>, but wraps the result in only one function</p>
-<pre id='rust-example-rendered' class='rust '>
-<span class='ident'>asynchronous</span>::<span class='ident'>Promise</span>::<span class='ident'>new</span>(<span class='op'>||</span> {
-   <span class='ident'>std</span>::<span class='ident'>thread</span>::<span class='ident'>sleep_ms</span>(<span class='number'>100</span>);
-   <span class='kw'>if</span> <span class='boolval'>true</span> { <span class='prelude-val'>Ok</span>(<span class='number'>32</span>) } <span class='kw'>else</span> { <span class='prelude-val'>Err</span>(<span class='string'>&quot;Error txt&quot;</span>) }
-}).<span class='ident'>finally_wrap</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> { 
-   <span class='comment'>// Executed always at the end.</span>
-   <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>.<span class='ident'>unwrap</span>(), <span class='number'>32</span>);
-});
-
-<span class='kw'>let</span> <span class='ident'>a</span> <span class='op'>=</span> <span class='number'>2</span> <span class='op'>+</span> <span class='number'>3</span>;  <span class='comment'>// This line is executed before the above Promise</span>
- 
-</pre>
-</div><h4 id='method.finally_sync_wrap' class='method'><code>fn <a href='#method.finally_sync_wrap' class='fnname'>finally_sync_wrap</a>&lt;F&gt;(self, f: F) <span class='where'>where F: <a class='trait' href='http://doc.rust-lang.org/nightly/core/marker/trait.Send.html' title='core::marker::Send'>Send</a> + 'static + <a class='trait' href='http://doc.rust-lang.org/nightly/core/ops/trait.FnOnce.html' title='core::ops::FnOnce'>FnOnce</a>(<a class='enum' href='http://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;T, E&gt;)</span></code></h4>
-<div class='docblock'><p>The same functionality as <strong>finally_sync</strong>, but wraps the result in only one function</p>
-<pre id='rust-example-rendered' class='rust '>
-<span class='ident'>asynchronous</span>::<span class='ident'>Promise</span>::<span class='ident'>new</span>(<span class='op'>||</span> {
-   <span class='ident'>std</span>::<span class='ident'>thread</span>::<span class='ident'>sleep_ms</span>(<span class='number'>100</span>);
-   <span class='kw'>if</span> <span class='boolval'>true</span> { <span class='prelude-val'>Ok</span>(<span class='number'>32</span>) } <span class='kw'>else</span> { <span class='prelude-val'>Err</span>(<span class='string'>&quot;Error txt&quot;</span>) }
-}).<span class='ident'>finally_sync_wrap</span>(<span class='op'>|</span><span class='ident'>res</span><span class='op'>|</span> { 
-   <span class='comment'>// Executed always at the end.</span>
-   <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>res</span>.<span class='ident'>unwrap</span>(), <span class='number'>32</span>);
-});
-
-<span class='kw'>let</span> <span class='ident'>a</span> <span class='op'>=</span> <span class='number'>2</span> <span class='op'>+</span> <span class='number'>3</span>;  <span class='comment'>// This line is executed after the above Promise</span>
- 
 </pre>
 </div></div></section>
     <section id='search' class="content hidden"></section>
@@ -242,6 +210,10 @@ It doesn&#39;t return anything, but it&#39;s synchronized with the caller</p>
                 <code>struct</code>, <code>enum</code>,
                 <code>trait</code>, <code>typedef</code> (or
                 <code>tdef</code>).
+            </p>
+            <p>
+                Search functions by type signature (e.g.
+                <code>vec -> usize</code>)
             </p>
         </div>
     </div>
